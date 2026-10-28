@@ -973,7 +973,10 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
 
 <div class="card" data-sec="bot"><h2>QQ 登录</h2>
   <div class="row">
-    <div style="flex:0 0 210px"><div id="qrbox" class="muted">没有二维码</div></div>
+    <div style="flex:0 0 210px"><div id="qrbox" class="muted">没有二维码</div>
+      <div style="text-align:center;margin-top:8px">
+        <button class="ghost" onclick="forceQR()" style="flex:0 0 auto">刷新二维码</button>
+      </div></div>
     <div>
       <div id="accinfo" style="margin-bottom:12px">读取账号…</div>
       <label>NapCat 地址</label><input id="ws" readonly>
@@ -1153,6 +1156,16 @@ async function boot(){
   $('inst').innerHTML=d.instances.map(i=>`<option>${i.name}</option>`).join('');
   $('inst').onchange=()=>{CUR=$('inst').value;loadState()};
   CUR=d.instances[0]?.name; await loadState();
+}
+
+async function forceQR(){
+  try{
+    const s=await j('/api/state?name='+encodeURIComponent(CUR));
+    QRM=0; renderQR(s); STATE=s;
+    const age=(Date.now()/1000)-(s.qr_mtime||0);
+    if(s.qr_mtime && age>180) toast('已刷新，但这张二维码是 '+Math.round(age/60)+' 分钟前的，可能已过期：点「打开 QQ」重新生成');
+    else toast('二维码已刷新');
+  }catch(e){ toast('刷新失败：'+e.message); }
 }
 
 async function refreshLight(){
