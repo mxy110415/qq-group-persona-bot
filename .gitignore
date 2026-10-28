@@ -1,0 +1,22 @@
+# 真实配置（含密钥/QQ号/token）
+config.json
+whitelist.json
+group_configs.json
+affinity.json
+tokens.json
+user_memory.json
+.env
+*.env
+# 运行产物
+*.log
+*.tmp
+__pycache__/
+*.pyc
+# QQ 客户端副本与登录态
+QQn/
+qqdata/
+# 表情包图片
+meme-pack/**/*.jpg
+meme-pack/**/*.png
+meme-pack/**/*.gif
+meme-pack/**/*.webp

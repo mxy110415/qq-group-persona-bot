@@ -1,0 +1,246 @@
+# QQ 群聊人格机器人
+
+> 一个有固定人设、长期记忆与好感度的 QQ 群聊 AI，基于 OneBot11 + NapCat + DeepSeek。
+
+不是那种「@ 一下就回一句罐头话」的机器人。它会**潜水观察群聊、按冷热场决定插不插话**，记得每个人说过什么、跟你熟到什么程度，说话带情绪、会损人、会撒娇 —— 人设是写死在配置里的，不是每次临场编。
+
+---
+
+## 它和普通 QQ 机器人的区别
+
+| 普通机器人 | 这个 |
+|---|---|
+| 每条消息都回，像客服 | 潜水为主，冷场时不说话，热场才插嘴 |
+| 每次都重新认识你 | 记录用户画像、好感度、长期印象 |
+| 回答千篇一律 | 反模板闸 + 去句末句号，尽量不像 AI |
+| 什么都说 | 政治/违法/色情内容硬拦截，群聊直接静默 |
+| 只认文字 | 能看图（多模态）、能解析卡片/合并转发、能抓 B 站视频信息 |
+
+---
+
+## 功能
+
+### 群聊行为
+- **冷热场动态权重**：群沉寂越久越不说话；10 分钟内有人聊过天，插话概率上调（最高 ×1.5）
+- **群友疲劳度**：同一个人 120 秒内 @ 5 次自动冷却 60 秒（主人豁免），防止被刷屏
+- **禁言实时检测**：被禁言后停止发言，用 `get_group_member_info` 每 5 秒核实
+- **低信息量过滤**：`哈哈` `666` `好的` `收到` 这类不触发
+- **反模板闸**：过滤「作为一个 AI」「希望能帮到你」等典型 AI 腔
+- **去句末句号**：`行吧。` → `行吧`，更像真人打字
+- **多段发送**：长回复按标点切成 1~3 条短消息
+- **戳一戳回应**：被戳会回应，可在群配置里关掉
+
+### 记忆
+- **群级 / 私聊独立上下文**，超长自动压缩
+- **用户画像**：`/memory` 可查，长期印象注入 system prompt
+- **好感度**：随对话评估增减，影响语气；`/好感度` 可查
+- **群级独立配置**：每个群单独设插话概率、静默时段、表情包开关
+
+### 消息处理
+- **图片识别**：走 DeepSeek 多模态，不需要额外视觉模型
+- **链接解析**：B 站走官方 API 拿标题/UP 主/播放量/分P；其他站点抓网页标题
+- **卡片消息**：QQ 小程序、分享卡片能读出文字
+- **合并转发展开**：前 8 条
+- **外链混淆**：防止被判定为引流
+
+### 安全
+- **敏感词硬过滤**（不是靠模型自觉）：政治人物、敏感事件、分裂主张、违法违禁、色情低俗等 8 类
+- **输入 / 输出双向拦截**：群聊命中完全静默，私聊一句岔开；日志只记「命中已拦截」，不落原文
+- **词库外置** `sensitive.json`，改完 5 秒生效，不用重启
+- **指令注入检测**：识别「忽略之前的设定」「开发者模式」这类越狱话术
+- **主人开关**：`/暂停` `/恢复` 随时叫停
+
+---
+
+## 架构
+
+```
+QQ 客户端（LinuxQQ）
+   └─ NapCat（注入，提供 OneBot11）
+        └─ WebSocket ws://127.0.0.1:3000
+             └─ bot.py（本项目）
+                  ├─ 消息解析 / 过滤 / 行为决策
+                  ├─ 上下文与记忆（JSON + 摘要压缩）
+                  ├─ 敏感词过滤（sensitive.json）
+                  └─ DeepSeek API（文本 + 图片）
+```
+
+---
+
+## 快速开始
+
+### 前置
+
+1. **LinuxQQ**（NT 版，实测 3.2.34）
+2. **NapCat.Shell**（实测 4.18.41，注意不是 Framework 版 —— 那个是 Windows 的）
+3. **DeepSeek API Key**
+
+> NapCat 的安装是把它放进 QQ 的资源目录并替换入口，详见 NapCat 官方文档。本文不重复。
+
+### 配置
+
+```bash
+cp config.example.json config.json
+cp whitelist.example.json whitelist.json
+cp group_configs.example.json group_configs.json
+```
+
+`config.json` 里必填：
+
+| 字段 | 说明 |
+|---|---|
+| `api.key` | DeepSeek API Key |
+| `api.base_url` | `https://api.deepseek.com` |
+| `api.model` | `deepseek-flash` |
+| `owner_id` | 主人 QQ 号 |
+| `admins` | 管理员 QQ 号数组 |
+| `napcat_ws` | NapCat 的 WebSocket 地址 |
+| `ws_token` | NapCat 配置里的 token |
+| `persona` | 人格设定（纯文本，想改成谁就改成谁） |
+
+### 白名单
+
+```json
+{
+  "groups": ["123456789"],
+  "friends": ["10001"]
+}
+```
+
+**群和私聊都只回白名单内的**，不在名单里完全静默。
+
+### 运行
+
+```bash
+pip install websockets
+python bot.py
+```
+
+启动正常会看到：
+
+```
+[启动] 模型=deepseek-flash 私聊=白名单 群聊=潜水插嘴 概率=8.0% ...
+[连接] 已连上 NapCat: ws://127.0.0.1:3000
+[登录] 机器人 UIN = 3xxxxxxx
+```
+
+---
+
+## 指令
+
+| 指令 | 别名 | 权限 | 作用 |
+|---|---|---|---|
+| `/好感度` | `/好感` | 所有人 | 查自己好感度；主人可 `@某人` 或 `+10` `-10` `80` |
+| `/memory` | `/记忆` | 所有人 | 查自己画像；主人可查别人 |
+| `/暂停` | `/停止` | 主人 | 停止回复 |
+| `/恢复` | `/继续` | 主人 | 恢复回复 |
+| `/new` | `/清空` | 主人 | 清当前会话；`/new all` 清全部 |
+| `/compress` | `/压缩` | 主人 | 立即压缩上下文 |
+
+群里需要 **@机器人** 才算指令；非主人发其它斜杠命令会被静默丢弃（不暴露指令系统）。
+
+---
+
+## 配置项
+
+### 全局 `config.json`
+
+```jsonc
+{
+  "group_mode": {
+    "chance": 0.08,          // 群聊插话基础概率
+    "cooldown": [900, 2700], // 两次插话间隔（秒）
+    "hourly_limit": 3,       // 每小时最多插话次数
+    "quiet_hours": [2, 7]    // 静默时段
+  },
+  "name_triggers": ["伊蕾娜", "魔女"],   // 谁叫都响应
+  "owner_only_triggers": ["老婆"]        // 只有主人说才响应
+}
+```
+
+### 群级 `group_configs.json`
+
+```jsonc
+{
+  "123456789": {
+    "interject_prob": 0.08,
+    "enable_interject": true,
+    "enable_sleep": true,
+    "quiet_hours": [2, 7],
+    "enable_poke": true,
+    "enable_meme": true,
+    "meme_prob": 0.10
+  }
+}
+```
+
+### 敏感词 `sensitive.json`
+
+```jsonc
+{
+  "categories": {
+    "政治人物": ["..."],
+    "敏感事件": ["..."]
+  },
+  "私聊回避话术": ["这个不聊，换个话题吧"]
+}
+```
+
+改完保存即生效（服务端 5 秒缓存）。
+
+---
+
+## 部署（systemd）
+
+```ini
+# /etc/systemd/system/qqbot-client.service
+[Unit]
+Description=QQ Bot client
+After=network-online.target
+
+[Service]
+Type=simple
+User=<你的用户>
+WorkingDirectory=/path/to/bot
+ExecStart=/usr/bin/python3 bot.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now qqbot-client
+```
+
+NapCat 需要图形环境，在无头服务器上用 Xvfb：
+
+```ini
+ExecStartPre=/usr/bin/Xvfb :99 -screen 0 1280x900x24 -nolisten tcp
+ExecStart=/path/to/QQn/qq --no-sandbox --user-data-dir=/path/to/qqdata
+Environment=DISPLAY=:99
+```
+
+---
+
+## 已知限制
+
+- **图片识别**依赖模型的多模态能力，不是所有 DeepSeek 端点都支持；发图失败会静默降级成纯文本
+- **视频**只能拿到标题/简介，看不到画面（本地没有视频理解能力）
+- **敏感词**挡不住谐音、拆字、拼音首字母，需要自己补词
+- **LinuxQQ 重启后可能要求重新扫码**，快速登录在无头 Xvfb 环境下不稳定
+- **表情包**需要自己往 `meme-pack/<情绪>/` 放图，空目录自动跳过
+- 群聊插话靠概率 + 判断，**可能长时间不吭声**，这是设计而不是故障
+
+---
+
+## 致谢
+
+初版 `bot.py` 来源于 [lifefuck/qq-deepseek-realistic-bot](https://github.com/lifefuck/qq-deepseek-realistic-bot)，
+本仓库在其基础上做了大量重构与功能扩展（人格系统、安全过滤、多模态、群聊行为、记忆体系等）。
+
+## 许可证
+
+[MIT](LICENSE)
