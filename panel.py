@@ -229,6 +229,102 @@ def tail(path, n=120):
         return "读取日志失败: %s" % e
 
 
+# ---------------------------------------------------------------- 配置架构
+SCHEMA = {
+    "基础": [
+        {"key": "api.base_url", "label": "API 地址", "type": "str"},
+        {"key": "api.model", "label": "模型", "type": "str"},
+        {"key": "api.key", "label": "API Key", "type": "secret"},
+        {"key": "napcat_ws", "label": "NapCat 地址", "type": "str"},
+        {"key": "ws_token", "label": "NapCat Token", "type": "secret"},
+        {"key": "owner_id", "label": "主人 QQ", "type": "str"},
+        {"key": "owner_name", "label": "称呼主人为", "type": "str"},
+        {"key": "admins", "label": "管理员 QQ", "type": "list"},
+    ],
+    "群聊": [
+        {"key": "group_mode.enabled", "label": "启用群聊", "type": "bool"},
+        {"key": "group_mode.chance", "label": "插话概率", "type": "num", "step": 0.01, "hint": "0~1"},
+        {"key": "group_mode.min_gap_s", "label": "冷却下限（秒）", "type": "num"},
+        {"key": "group_mode.max_gap_s", "label": "冷却上限（秒）", "type": "num"},
+        {"key": "group_mode.max_per_hour", "label": "每小时最多", "type": "num"},
+        {"key": "group_mode.max_per_minute", "label": "每分钟最多", "type": "num"},
+        {"key": "group_mode.reply_window_s", "label": "回应窗口（秒）", "type": "num"},
+        {"key": "group_mode.max_consecutive", "label": "最多连发", "type": "num"},
+        {"key": "group_mode.quiet_hours", "label": "静默时段（起,止）", "type": "pair"},
+        {"key": "quiet_groups", "label": "只读群（不插话）", "type": "list"},
+    ],
+    "触发": [
+        {"key": "name_triggers", "label": "叫名字就响应", "type": "list"},
+        {"key": "topic_triggers", "label": "话题触发词", "type": "list"},
+        {"key": "owner_only_triggers", "label": "仅主人触发", "type": "list"},
+        {"key": "affinity_cmds", "label": "好感度指令别名", "type": "list"},
+    ],
+    "记忆与限制": [
+        {"key": "limits.max_history_turns", "label": "保留对话轮数", "type": "num"},
+        {"key": "limits.per_user_per_minute", "label": "每人每分钟上限", "type": "num"},
+        {"key": "limits.reply_max_chars", "label": "回复最大字数", "type": "num"},
+        {"key": "limits.request_timeout_s", "label": "请求超时（秒）", "type": "num"},
+        {"key": "limits.temperature", "label": "温度", "type": "num", "step": 0.05},
+        {"key": "limits.compress_chars", "label": "压缩阈值（字）", "type": "num"},
+        {"key": "limits.keep_recent", "label": "压缩后保留条数", "type": "num"},
+    ],
+    "主动发言": [
+        {"key": "proactive.enabled", "label": "启用主动", "type": "bool"},
+        {"key": "proactive.continue_enabled", "label": "允许接着聊", "type": "bool"},
+        {"key": "proactive.timer_enabled", "label": "定时冒泡", "type": "bool"},
+        {"key": "proactive.min_gap_s", "label": "最小间隔（秒）", "type": "num"},
+        {"key": "proactive.max_gap_s", "label": "最大间隔（秒）", "type": "num"},
+        {"key": "proactive.continue_idle_s", "label": "多久没聊可续（秒）", "type": "num"},
+        {"key": "proactive.continue_window_s", "label": "续聊窗口（秒）", "type": "num"},
+    ],
+    "成本": [
+        {"key": "cost.usd_to_cny", "label": "汇率", "type": "num", "step": 0.1},
+        {"key": "cost.price_hit", "label": "缓存命中价", "type": "pairf"},
+        {"key": "cost.price_miss", "label": "缓存未命中价", "type": "pairf"},
+        {"key": "cost.price_out", "label": "输出价", "type": "pairf"},
+        {"key": "cost.report_hour", "label": "日报（时）", "type": "num"},
+        {"key": "cost.report_minute", "label": "日报（分）", "type": "num"},
+    ],
+    "表情包": [
+        {"key": "meme_dir", "label": "表情包目录", "type": "str"},
+    ],
+}
+
+
+def get_dotted(d, path):
+    cur = d
+    for part in path.split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(part)
+    return cur
+
+
+def set_dotted(d, path, value):
+    parts = path.split(".")
+    cur = d
+    for part in parts[:-1]:
+        if part not in cur or not isinstance(cur[part], dict):
+            cur[part] = {}
+        cur = cur[part]
+    cur[parts[-1]] = value
+
+
+MASK = "••••••保留原值••••••"
+
+
+def config_view(home):
+    cfg = read_json(os.path.join(home, "config", "config.json"), {}) or {}
+    out = {}
+    for fields in SCHEMA.values():
+        for f in fields:
+            v = get_dotted(cfg, f["key"])
+            if f["type"] == "secret":
+                v = MASK if v else ""
+            out[f["key"]] = v
+    return out
+
+
 # ---------------------------------------------------------------- 设置
 SETTINGS_FILE = os.path.join(ROOT, "panel-settings.json")
 DEFAULT_SETTINGS = {
@@ -478,6 +574,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 pre{background:#0c0c0f;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;max-height:280px;font-size:12px;margin:0}
 img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;background:#fff;padding:6px}
 .muted{color:var(--dim);font-size:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px}
+.tab{padding:6px 12px;border-radius:8px;background:#222228;color:var(--dim);cursor:pointer;font-size:13px;border:1px solid transparent}
+.tab.on{background:rgba(106,168,255,.16);color:#cfe2ff;border-color:rgba(106,168,255,.45)}
+.field{margin-bottom:12px}
+.field .hint{font-size:11px;color:#6f6f78;margin-top:3px}
 </style></head><body><div class="wrap">
 <h1>QQ 群聊人格机器人 · 调试面板</h1>
 <div class="sub" id="sub">加载中…</div>
@@ -505,20 +606,13 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card"><h2>说话节奏</h2>
-  <div class="row">
-    <div><label>插话概率（0~1）</label><input id="chance" type="number" step="0.01" min="0" max="1"></div>
-    <div><label>冷却下限（秒）</label><input id="cd_min" type="number" min="0"></div>
-    <div><label>冷却上限（秒）</label><input id="cd_max" type="number" min="0"></div>
-    <div><label>每小时最多</label><input id="hourly" type="number" min="0"></div>
+<div class="card"><h2>配置</h2>
+  <div class="tabs" id="tabs"></div>
+  <div id="form" style="margin-top:14px"></div>
+  <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+    <button onclick="saveTab()">保存本页</button>
+    <span class="muted" id="savehint"></span>
   </div>
-  <div class="row" style="margin-top:12px">
-    <div><label>静默开始（点）</label><input id="q_from" type="number" min="0" max="23"></div>
-    <div><label>静默结束（点）</label><input id="q_to" type="number" min="0" max="23"></div>
-    <div><label>触发词（逗号分隔）</label><input id="trig"></div>
-    <div><label>仅主人触发（逗号分隔）</label><input id="otrig"></div>
-  </div>
-  <div style="margin-top:12px"><button onclick="saveConfig()">保存参数</button></div>
 </div>
 
 <div class="card"><h2>白名单</h2>
@@ -526,7 +620,18 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
     <div><label>群号（逗号分隔）</label><input id="groups"></div>
     <div><label>好友/私聊号（逗号分隔）</label><input id="friends"></div>
   </div>
-  <div style="margin-top:12px"><button onclick="saveWhitelist()">保存白名单</button></div>
+  <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+    <button onclick="saveWhitelist()">保存白名单</button>
+    <span class="muted">不在这里的群/人，机器人完全不响应</span>
+  </div>
+</div>
+
+<div class="card"><h2>敏感词库</h2>
+  <textarea id="sens" style="min-height:220px" spellcheck="false"></textarea>
+  <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+    <button onclick="saveSens()">保存词库</button>
+    <span class="muted" id="sensinfo"></span>
+  </div>
 </div>
 
 <div class="card"><h2>人格</h2>
@@ -612,18 +717,12 @@ async function loadState(){
   $('sub').innerHTML=`实例 <b>${s.name}</b> · ${s.bot_running?'<span class="pill ok">进程在跑</span>':'<span class="pill bad">进程未运行</span>'} · ${s.ws_ok?'<span class="pill ok">NapCat 在线</span>':'<span class="pill bad">NapCat 未连</span>'}`;
   $('state').innerHTML=`<span class="pill">主人 ${s.owner_id||'未设'}</span> <span class="pill">称呼 ${s.owner_name||'-'}</span> <span class="pill">模型 ${s.model||'-'}</span> <span class="pill">群 ${s.groups.length} · 好友 ${s.friends.length}</span>`;
   $('ws').value=s.ws||'';
-  $('chance').value=gm.chance??''; 
-  const cd=gm.cooldown||[900,2700];
-  $('cd_min').value=cd[0]??''; $('cd_max').value=cd[1]??'';
-  $('hourly').value=gm.hourly_limit??'';
-  const q=gm.quiet_hours||[2,7];
-  $('q_from').value=q[0]??''; $('q_to').value=q[1]??'';
-  $('trig').value=(s.name_triggers||[]).join(',');
-  $('otrig').value=(s.owner_only_triggers||[]).join(',');
   $('groups').value=(s.groups||[]).join(',');
   $('friends').value=(s.friends||[]).join(',');
   renderQR(s);
   await loadPersonas();
+  await loadConfig();
+  try{ const sn=await j('/api/sensitive?name='+encodeURIComponent(CUR)); $('sens').value=sn.text||''; }catch(e){}
   loadLogs();
 }
 
@@ -638,16 +737,60 @@ async function loadLogs(){
   const el=$('logs'); el.textContent=d.log||'（暂无日志）'; el.scrollTop=el.scrollHeight;
 }
 
-async function saveConfig(){
-  const body={name:CUR,group_mode:{
-    chance:parseFloat($('chance').value)||0,
-    cooldown:[parseInt($('cd_min').value)||0,parseInt($('cd_max').value)||0],
-    hourly_limit:parseInt($('hourly').value)||0,
-    quiet_hours:[parseInt($('q_from').value)||0,parseInt($('q_to').value)||0]},
-    name_triggers:$('trig').value.split(',').map(x=>x.trim()).filter(Boolean),
-    owner_only_triggers:$('otrig').value.split(',').map(x=>x.trim()).filter(Boolean)};
-  const r=await j('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  alert(r.message||'已保存'); loadState();
+let SCHEMA=null, VALUES=null, CURTAB=null;
+
+async function loadConfig(){
+  const d=await j('/api/config?name='+encodeURIComponent(CUR));
+  SCHEMA=d.schema; VALUES=d.values;
+  const tabs=Object.keys(SCHEMA);
+  if(!CURTAB||!tabs.includes(CURTAB)) CURTAB=tabs[0];
+  $('tabs').innerHTML=tabs.map(t=>`<div class="tab${t===CURTAB?' on':''}" onclick="pickTab('${t}')">${t}</div>`).join('');
+  renderForm();
+  try{
+    const st=await j('/api/stats?name='+encodeURIComponent(CUR));
+    $('sensinfo').textContent=`当前词条 ${st.sensitive_words} 条 · 好感记录 ${st.affinity_users} 人 · 画像 ${st.memory_users} 人`;
+  }catch(e){}
+}
+
+function pickTab(t){ CURTAB=t; loadConfig(); }
+function esc(v){ return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function renderForm(){
+  const fields=SCHEMA[CURTAB]||[];
+  $('form').innerHTML=fields.map(f=>{
+    const v=VALUES[f.key];
+    const id='f_'+f.key.replace(/\./g,'_');
+    if(f.type==='bool')
+      return `<div class="field"><label><input type="checkbox" id="${id}" ${v?'checked':''} style="width:auto;margin-right:8px">${f.label}</label></div>`;
+    if(f.type==='secret')
+      return `<div class="field"><label>${f.label}</label><input id="${id}" value="${esc(v)}" autocomplete="off"><div class="hint">掩码表示保留原值，要换就直接填新值</div></div>`;
+    if(f.type==='list')
+      return `<div class="field"><label>${f.label}</label><input id="${id}" value="${esc((v||[]).join(','))}"><div class="hint">逗号分隔</div></div>`;
+    if(f.type==='pair'||f.type==='pairf')
+      return `<div class="field"><label>${f.label}</label><input id="${id}" value="${esc((v||[]).join(','))}"><div class="hint">两个值，逗号分隔</div></div>`;
+    return `<div class="field"><label>${f.label}</label><input id="${id}" type="number" step="${f.step||'any'}" value="${esc(v)}">${f.hint?`<div class="hint">${f.hint}</div>`:''}</div>`;
+  }).join('');
+}
+
+async function saveTab(){
+  const fields=SCHEMA[CURTAB]||[], values={};
+  for(const f of fields){
+    const el=document.getElementById('f_'+f.key.replace(/\./g,'_'));
+    if(!el) continue;
+    values[f.key]= f.type==='bool' ? el.checked : el.value;
+  }
+  const r=await j('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:CUR,values})});
+  $('savehint').textContent=r.message;
+  await loadConfig();
+}
+
+async function saveSens(){
+  try{
+    const r=await j('/api/sensitive',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:CUR,text:$('sens').value})});
+    alert(r.message);
+  }catch(e){alert('保存失败：'+e.message)}
 }
 
 async function saveWhitelist(){
@@ -835,6 +978,26 @@ class Handler(BaseHTTPRequestHandler):
             with open(qr, "rb") as f:
                 data = f.read()
             return self._send(200, data, "image/png")
+        if u.path == "/api/config":
+            inst = self._inst(name)
+            return self._json({"schema": SCHEMA, "values": config_view(instance_home(inst))})
+        if u.path == "/api/sensitive":
+            inst = self._inst(name)
+            pth = os.path.join(instance_home(inst), "data", "sensitive.json")
+            try:
+                with open(pth, encoding="utf-8") as f:
+                    return self._json({"path": pth, "text": f.read()})
+            except Exception as e:
+                return self._json({"path": pth, "text": "", "error": str(e)[:100]})
+        if u.path == "/api/stats":
+            inst = self._inst(name)
+            home2 = instance_home(inst)
+            aff = read_json(os.path.join(home2, "data", "affinity.json"), {}) or {}
+            mem = read_json(os.path.join(home2, "data", "user_memory.json"), {}) or {}
+            sen = read_json(os.path.join(home2, "data", "sensitive.json"), {}) or {}
+            words = sum(len(v) for v in (sen.get("categories") or {}).values() if isinstance(v, list))
+            return self._json({"affinity_users": len(aff), "memory_users": len(mem),
+                               "sensitive_words": words})
         if u.path == "/api/personas":
             inst = self._inst(name)
             home = instance_home(inst)
@@ -970,24 +1133,52 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/config":
             path = os.path.join(home, "config", "config.json")
             cfg = read_json(path, {}) or {}
-            gm = body.get("group_mode") or {}
-            cfg.setdefault("group_mode", {})
-            if "chance" in gm:
-                cfg["group_mode"]["chance"] = gm["chance"]
-            if "hourly_limit" in gm:
-                cfg["group_mode"]["max_per_hour"] = gm["hourly_limit"]
-            if "cooldown" in gm:
-                cd = gm["cooldown"] or [900, 2700]
-                cfg["group_mode"]["min_gap_s"] = cd[0]
-                cfg["group_mode"]["max_gap_s"] = cd[1] if len(cd) > 1 else cd[0]
-            if "quiet_hours" in gm:
-                cfg["group_mode"]["quiet_hours"] = gm["quiet_hours"]
-            if "name_triggers" in body:
-                cfg["name_triggers"] = body["name_triggers"]
-            if "owner_only_triggers" in body:
-                cfg["owner_only_triggers"] = body["owner_only_triggers"]
+            values = body.get("values") or {}
+            changed = []
+            for key, val in values.items():
+                field = None
+                for fields in SCHEMA.values():
+                    for f in fields:
+                        if f["key"] == key:
+                            field = f
+                            break
+                    if field:
+                        break
+                if not field:
+                    continue
+                if field["type"] == "secret" and val == MASK:
+                    continue
+                if field["type"] == "list":
+                    val = [x.strip() for x in str(val).split(",") if x.strip()]
+                elif field["type"] == "num":
+                    try:
+                        fv = float(val)
+                        val = int(fv) if fv == int(fv) else fv
+                    except Exception:
+                        continue
+                elif field["type"] == "bool":
+                    val = bool(val)
+                elif field["type"] in ("pair", "pairf"):
+                    try:
+                        parts = [x.strip() for x in str(val).replace("，", ",").split(",")]
+                        val = [float(parts[0]), float(parts[1])] if field["type"] == "pairf" else [int(parts[0]), int(parts[1])]
+                    except Exception:
+                        continue
+                set_dotted(cfg, key, val)
+                changed.append(key)
             write_json(path, cfg)
-            return self._json({"message": "参数已保存（重启后完全生效）"})
+            return self._json({"message": "已保存 %d 项（重启后生效）" % len(changed), "changed": changed})
+
+        if u.path == "/api/sensitive":
+            pth = os.path.join(home, "data", "sensitive.json")
+            text = body.get("text", "")
+            try:
+                json.loads(text)
+            except Exception as e:
+                return self._json({"error": "不是合法 JSON：" + str(e)[:80]}, 400)
+            with open(pth, "w", encoding="utf-8") as f:
+                f.write(text)
+            return self._json({"message": "敏感词库已保存（5 秒内生效）"})
 
         if u.path == "/api/whitelist":
             path = os.path.join(home, "config", "whitelist.json")
