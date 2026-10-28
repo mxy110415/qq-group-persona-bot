@@ -539,6 +539,76 @@ def open_qq(home):
     return True, "NapCat 已起来，窗口稍后出现"
 
 
+# ---------------------------------------------------------------- NapCat 连接
+def napcat_cfg_file(home):
+    """找到 NapCat 的 onebot11_<uin>.json"""
+    import glob
+    pats = sorted(glob.glob(os.path.join(home, "QQn", "resources", "app", "napcat",
+                                         "config", "onebot11_*.json")))
+    return pats[0] if pats else None
+
+
+def napcat_net(home):
+    """读 NapCat 的 websocket 服务器设置"""
+    f = napcat_cfg_file(home)
+    out = {"file": f, "exists": bool(f), "host": "127.0.0.1", "port": 3000,
+           "enable": True, "token_set": False}
+    if not f:
+        return out
+    try:
+        with open(f, encoding="utf-8") as fp:
+            d = json.load(fp)
+        srv = ((d.get("network") or {}).get("websocketServers") or [{}])[0]
+        out["host"] = srv.get("host") or "127.0.0.1"
+        out["port"] = int(srv.get("port") or 3000)
+        out["enable"] = bool(srv.get("enable", True))
+        out["token_set"] = bool(srv.get("token"))
+    except Exception as e:
+        out["error"] = str(e)[:100]
+    return out
+
+
+def napcat_set_net(home, host, port, token=None, enable=None):
+    """写回 NapCat 配置，并同步面板的 napcat_ws / ws_token"""
+    f = napcat_cfg_file(home)
+    if not f:
+        return False, "没找到 NapCat 配置文件（QQn/resources/app/napcat/config/onebot11_*.json）"
+    try:
+        with open(f, encoding="utf-8") as fp:
+            d = json.load(fp)
+        net = d.setdefault("network", {})
+        servers = net.setdefault("websocketServers", [])
+        if not servers:
+            servers.append({"name": "hermes-ws", "enable": True, "messagePostFormat": "array"})
+        srv = servers[0]
+        srv["host"] = host
+        srv["port"] = int(port)
+        if enable is not None:
+            srv["enable"] = bool(enable)
+        if token:
+            srv["token"] = token
+        tmp = f + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fp:
+            json.dump(d, fp, ensure_ascii=False, indent=2)
+        os.replace(tmp, f)
+    except Exception as e:
+        return False, "写 NapCat 配置失败：%s" % str(e)[:100]
+
+    # 同步面板配置（bot.py 连的地址）
+    try:
+        cfg_path = os.path.join(home, "config", "config.json")
+        cfg = read_json(cfg_path, {}) or {}
+        conn_host = "127.0.0.1" if host in ("0.0.0.0", "", "::") else host
+        cfg["napcat_ws"] = "ws://%s:%d" % (conn_host, int(port))
+        if token:
+            cfg["ws_token"] = token
+        with open(cfg_path, "w", encoding="utf-8") as fp:
+            json.dump(cfg, fp, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return True, "NapCat 已更新，但同步面板配置失败：%s" % str(e)[:80]
+    return True, "已保存"
+
+
 # ---------------------------------------------------------------- 配置架构
 SCHEMA = {
     "基础": [
@@ -988,6 +1058,21 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
+<div class="card" data-sec="bot"><h2>NapCat 连接</h2>
+  <div class="row">
+    <div><label>主机</label><input id="nc_host" placeholder="127.0.0.1"></div>
+    <div><label>端口</label><input id="nc_port" type="number" placeholder="3000"></div>
+    <div><label>令牌（留空表示不修改）</label><input id="nc_token" type="password" autocomplete="off" placeholder="未设置"></div>
+  </div>
+  <div class="muted" id="nc_hint" style="margin-top:10px">读取中…</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+    <button onclick="saveNapcat(false)">保存</button>
+    <button class="ghost" onclick="saveNapcat(true)">保存并重启 NapCat</button>
+    <button class="ghost" onclick="testNapcat()">测试连接</button>
+  </div>
+  <div class="hint">主机填 0.0.0.0 表示允许其它机器连入，这时一定要设令牌。保存会同时更新机器人连接的地址。</div>
+</div>
+
 <div class="card" data-sec="bot"><h2>开关与试聊</h2>
   <div class="row" style="align-items:flex-end">
     <div><label>紧急暂停</label><div id="pausestate" class="muted">读取中…</div></div>
@@ -1158,6 +1243,35 @@ async function boot(){
   CUR=d.instances[0]?.name; await loadState();
 }
 
+async function loadNapcat(){
+  try{
+    const d=await j('/api/napcat/net?name='+encodeURIComponent(CUR));
+    if(document.activeElement!==$('nc_host')) $('nc_host').value=d.host||'127.0.0.1';
+    if(document.activeElement!==$('nc_port')) $('nc_port').value=d.port||3000;
+    $('nc_hint').textContent=`配置：${d.file||'未找到'} · ${d.enable?'已启用':'已停用'} · 令牌${d.token_set?'已设置':'未设置'}`;
+  }catch(e){ $('nc_hint').textContent='读取失败：'+e.message; }
+}
+
+async function saveNapcat(restart){
+  try{
+    const body={name:CUR, host:$('nc_host').value.trim()||'127.0.0.1',
+                port:parseInt($('nc_port').value||'3000',10),
+                token:$('nc_token').value, restart:!!restart, reconnect_bot:!!restart};
+    await j('/api/napcat/net',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    $('nc_token').value='';
+    toast(restart?'已保存，正在重启 NapCat…':'已保存');
+    setTimeout(()=>{loadNapcat(); if(restart) setTimeout(loadState, 12000); else loadState();}, restart?1500:300);
+  }catch(e){ toast('保存失败：'+e.message); }
+}
+
+async function testNapcat(){
+  try{
+    const s=await j('/api/state?name='+encodeURIComponent(CUR));
+    toast(s.ws_ok? '连接正常：NapCat 在线' : '连不上 NapCat（端口没监听或令牌不对）');
+  }catch(e){ toast('测试失败：'+e.message); }
+}
+
 async function forceQR(){
   try{
     toast('刷新中…如果二维码没变，会让 QQ 重新生成（约 20 秒）');
@@ -1189,6 +1303,7 @@ async function refreshLight(){
   }catch(e){}
   loadQQ();
   loadPause();
+  loadNapcat();
 }
 
 async function loadState(){
@@ -1683,6 +1798,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"name": APP_NAME, "author": APP_AUTHOR, "version": APP_VERSION,
                                "build": local_version() or "-", "repo": REPO_URL,
                                "releases": RELEASES_URL, "issues": ISSUES_URL})
+        if u.path == "/api/napcat/net":
+            inst = self._inst(name)
+            return self._json(napcat_net(instance_home(inst)))
+
         if u.path == "/api/theme":
             inst = self._inst(name)
             tf = os.path.join(instance_home(inst), "data", ".theme")
@@ -1988,6 +2107,30 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._json({"error": "恢复失败：%s" % str(e)[:120]}, 400)
             return self._json({"message": "已恢复 %d 个文件（重启后生效）" % n})
+
+        if u.path == "/api/napcat/net":
+            inst = self._inst(body.get("name"))
+            home2 = instance_home(inst)
+            host = (body.get("host") or "127.0.0.1").strip()
+            try:
+                port = int(body.get("port") or 3000)
+            except Exception:
+                return self._json({"error": "端口必须是数字"}, 400)
+            if not (1 <= port <= 65535):
+                return self._json({"error": "端口范围 1~65535"}, 400)
+            token = body.get("token") or ""
+            ok, msg = napcat_set_net(home2, host, port, token or None)
+            if not ok:
+                return self._json({"error": msg}, 400)
+            restarted = False
+            if body.get("restart"):
+                _run(["systemctl", "restart", "qqbot-napcat.service"], timeout=30)
+                time.sleep(2)
+                restarted = True
+            if body.get("reconnect_bot"):
+                bot_process_control(home2, "restart")
+            return self._json({"ok": True, "message": msg, "restarted": restarted,
+                               "net": napcat_net(home2)})
 
         if u.path == "/api/qr/refresh":
             inst = self._inst(body.get("name"))
