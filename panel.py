@@ -946,29 +946,11 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   <div class="tnav on" data-sec="bot" onclick="topTab('bot')">🤖 QQ 机器人</div>
   <div class="tnav" data-sec="persona" onclick="topTab('persona')">🎭 人格</div>
   <div class="tnav" data-sec="system" onclick="topTab('system')">⚙️ 系统</div>
-  <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-    <span class="muted" style="margin-right:2px">主题</span>
-    <div class="themebtn" data-t="system" onclick="setTheme('system')">跟随系统</div>
-    <div class="themebtn" data-t="dark" onclick="setTheme('dark')">深色</div>
-    <div class="themebtn" data-t="light" onclick="setTheme('light')">浅色</div>
-  </div>
 </div>
 <div id="mask"><div id="dlg"><h3 id="dlgtitle">提示</h3><div id="dlgmsg"></div>
   <div id="dlgbtns"><button class="ghost" id="dlgno">取消</button><button id="dlgyes">确定</button></div></div></div>
 <div id="toast"></div>
-<footer class="foot">
-  <div class="footrow">
-    <span class="tag" id="fapp">QQ 群聊人格机器人</span>
-    <span class="tag" id="fver">版本 —</span>
-    <span class="tag" id="fauthor">作者 —</span>
-  </div>
-  <div class="footrow">
-    <a class="fbtn" id="flink-repo" href="#" target="_blank" rel="noopener">GitHub 仓库</a>
-    <a class="fbtn" id="flink-rel" href="#" target="_blank" rel="noopener">版本发布</a>
-    <a class="fbtn" id="flink-iss" href="#" target="_blank" rel="noopener">问题反馈</a>
-  </div>
-  <div class="muted" style="margin-top:8px" id="fbuild">—</div>
-</footer>
+
 
 <div class="card" data-sec="bot"><h2>实例</h2>
   <div class="row"><div><label>选择实例</label><select id="inst"></select></div>
@@ -1053,7 +1035,19 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 </div>
 
 <div class="card" data-sec="system"><h2>设置</h2>
-  <div class="row">
+
+  <div class="row" style="align-items:flex-end">
+    <div><label>主题</label>
+      <div style="display:flex;gap:6px">
+        <div class="themebtn" data-t="system" onclick="setTheme('system')">跟随系统</div>
+        <div class="themebtn" data-t="dark" onclick="setTheme('dark')">深色</div>
+        <div class="themebtn" data-t="light" onclick="setTheme('light')">浅色</div>
+      </div>
+    </div>
+    <div></div>
+  </div>
+
+  <div class="row" style="margin-top:16px">
     <div><label>自动更新</label>
       <select id="autoupd">
         <option value="off">关闭（只手动点）</option>
@@ -1067,26 +1061,38 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
     <button onclick="saveSettings()">保存设置</button>
     <span class="muted" id="lastcheck"></span>
   </div>
-</div>
 
-<div class="card" data-sec="system"><h2>路径</h2><div id="paths" class="muted">读取中…</div></div>
-
-<div class="card" data-sec="system"><h2>自启与更新</h2>
-  <div class="row">
-    <div><label>开机自启（可选）</label><div id="autostart" class="muted">读取中…</div></div>
+  <div class="row" style="margin-top:18px;align-items:flex-end">
+    <div><label>开机自启</label><div id="autostart" class="muted">读取中…</div></div>
     <div style="display:flex;align-items:flex-end">
       <button id="autobtn" class="ghost" onclick="toggleAutostart()">开机自启</button>
     </div>
   </div>
-  <div class="row" style="margin-top:12px">
-    <div><label>版本</label><div id="ver" class="muted">—</div></div>
+
+  <div class="row" style="margin-top:18px;align-items:flex-end">
+    <div><label>版本与更新</label><div id="ver" class="muted">—</div></div>
     <div style="display:flex;align-items:flex-end;gap:8px">
       <button class="ghost" onclick="refreshAuto()">检查更新</button>
       <button onclick="doUpdate()">立即更新</button>
     </div>
   </div>
-  <div class="muted" style="margin-top:10px">更新源：github.com/mxy110415/qq-group-persona-bot · 只覆盖代码文件，不动 config / data / persona</div>
+
+  <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line)">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span class="tag" id="fapp">—</span>
+      <span class="tag" id="fver">—</span>
+      <span class="tag" id="fauthor">—</span>
+    </div>
+    <div class="muted" style="margin-top:8px" id="fbuild">—</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <a class="fbtn" id="flink-repo" href="#" target="_blank" rel="noopener">GitHub 仓库</a>
+      <a class="fbtn" id="flink-rel" href="#" target="_blank" rel="noopener">版本发布</a>
+      <a class="fbtn" id="flink-iss" href="#" target="_blank" rel="noopener">问题反馈</a>
+    </div>
+  </div>
 </div>
+
+<div class="card" data-sec="system"><h2>路径</h2><div id="paths" class="muted">读取中…</div></div>
 
 <div class="card" data-sec="bot"><h2>开关与试聊</h2>
   <div class="row" style="align-items:flex-end">
