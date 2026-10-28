@@ -18,7 +18,6 @@ import time
 
 # 老显卡/核显上 WebKitGTK 的合成器会明显掉帧，关掉后滚动和重绘更顺
 os.environ.setdefault("WEBKIT_DISABLE_COMPOSITING_MODE", "1")
-os.environ.setdefault("WEBKIT_FORCE_SANDBOX", "0")
 
 PANEL_URL = os.environ.get("PANEL_URL", "http://127.0.0.1:6100")
 SERVICE = "qqbot-panel.service"
@@ -134,13 +133,15 @@ def main():
     def on_decide(_v, decision, dtype):
         try:
             if dtype == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
-                uri = decision.get_request().get_uri() or ""
+                req = decision.get_request() if hasattr(decision, "get_request") else None
+                uri = req.get_uri() if req else ""
                 if uri.startswith(("http://", "https://")) and not uri.startswith(PANEL_URL):
                     open_external(uri)
                     decision.ignore()
                     return True
             if dtype == WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION:
-                uri = decision.get_request().get_uri() or ""
+                req = decision.get_request() if hasattr(decision, "get_request") else None
+                uri = req.get_uri() if req else ""
                 if uri.startswith(("http://", "https://")):
                     open_external(uri)
                     return True
