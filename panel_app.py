@@ -15,7 +15,7 @@ import subprocess
 import sys
 import time
 
-PANEL_URL = "http://127.0.0.1:6100"
+PANEL_URL = os.environ.get("PANEL_URL", "http://127.0.0.1:6100")
 SERVICE = "qqbot-panel.service"
 
 

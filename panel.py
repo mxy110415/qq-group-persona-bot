@@ -699,14 +699,18 @@ h1{font-size:18px;margin:0 0 4px}
 label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
 input,textarea,select{width:100%;background:var(--field);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit}
 select option{background:var(--card);color:var(--txt)}
+select{-webkit-appearance:none;appearance:none;background:var(--field);color:var(--txt);
+  background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+  padding-right:32px}
 select{color-scheme:dark}
-input::placeholder{color:#6f6f78}
+input::placeholder{color:var(--dim)}
 textarea{min-height:46vh;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.65}
 button{background:var(--acc);color:#06101f;border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
 button.ghost{background:var(--sub);color:var(--txt)}
 button.danger{background:var(--bad);color:#1a0000}
 button:disabled{opacity:.45;cursor:not-allowed}
-.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#26262c;color:var(--dim)}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:var(--sub);color:var(--dim);border:1px solid var(--line)}
 .pill.ok{background:rgba(61,220,132,.14);color:var(--ok)}
 .pill.bad{background:rgba(255,93,93,.14);color:var(--bad)}
 pre{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;max-height:280px;font-size:12px;margin:0}
@@ -726,12 +730,12 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 .themebtn.on{color:var(--acc);border-color:var(--acc)}
 .topnav{display:flex;gap:8px;margin:0 0 16px}
 .tnav{padding:9px 16px;border-radius:10px;background:var(--card);border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:13.5px}
-.tnav.on{background:rgba(106,168,255,.16);color:#cfe2ff;border-color:rgba(106,168,255,.5)}
+.tnav.on{background:rgba(106,168,255,.16);color:var(--acc);border-color:var(--acc)}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px}
 .tab{padding:6px 12px;border-radius:8px;background:var(--sub);color:var(--dim);cursor:pointer;font-size:13px;border:1px solid transparent}
-.tab.on{background:rgba(106,168,255,.16);color:#cfe2ff;border-color:rgba(106,168,255,.45)}
+.tab.on{background:rgba(106,168,255,.16);color:var(--acc);border-color:var(--acc)}
 .field{margin-bottom:12px}
-.field .hint{font-size:11px;color:#6f6f78;margin-top:3px}
+.field .hint{font-size:11px;color:var(--dim);margin-top:3px}
 </style></head><body><div class="wrap">
 <h1>QQ 群聊人格机器人 · 调试面板</h1>
 <div class="sub" id="sub">加载中…</div>
