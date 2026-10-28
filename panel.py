@@ -31,7 +31,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+# 打包成单文件 exe 时，代码解压在临时目录，运行数据要落在 exe 旁边
+ROOT = os.environ.get("QQBOT_ROOT") or os.path.dirname(os.path.abspath(__file__))
 BOT = os.path.join(ROOT, "bot.py")
 INSTANCES_FILE = os.path.join(ROOT, "instances.json")
 PY = sys.executable

@@ -266,15 +266,29 @@ systemctl --user enable --now qqbot-bot.service
 > 面板**不会**为了停止机器人去硬杀进程——系统级服务的 `Restart=always` 会把它拉起来，
 > 结果变成两个实例同时跑（会重复发消息）。所以拿不到权限时只提示，不乱动。
 
-## 三种获取方式
+## 四种获取方式
 
 | 方式 | 适合谁 | 怎么用 |
 |---|---|---|
-| **全量包** `qqbot-v0.1.0-full.zip`（85KB） | 想一次拿全，离线部署 | 解压 → `python3 launcher.py` |
-| **面板安装包** `qqbot-panel-installer.zip`（35KB） | 先要面板，再让面板去下程序 | 解压 → `python3 launcher.py` → 面板里选目录下载 |
+| **Debian 包** `qqbot-agent_*_all.deb` | Linux Mint / Ubuntu / Debian | 双击安装，或 `sudo dpkg -i` → `qqbot-panel` |
+| **Windows 程序** `QQBotPanel.exe` | Windows 10/11 | 解压到非系统目录，双击运行（面板用默认浏览器打开） |
 | **命令行** `bootstrap.sh` | 无图形界面的服务器 | 见下一节，一条命令 |
+| **源码包** `qqbot-*-source.zip` | 想自己改 | 解压 → `bash bootstrap.sh` |
 
-两个 zip 都在 [Releases](https://github.com/mxy110415/qq-group-persona-bot/releases) 页面。
+全部产物都在 [Releases](https://github.com/mxy110415/qq-group-persona-bot/releases) 页面，
+由 `.github/workflows/release.yml` 在打 tag 时自动构建。
+
+```
+Debian 包内容
+  /opt/qqbot/                 程序、人格、示例配置
+  /usr/bin/qqbot-panel        打开面板（有 GTK 用原生窗口，没有就退到浏览器）
+  /usr/bin/qqbot-server       只跑后端服务
+  /usr/lib/systemd/user/      开机自启用：systemctl --user enable --now qqbot-panel
+```
+
+装完第一次启动会自动从 `*.example.json` 生成 `config.json` / `whitelist.json`，
+配置文件在 `/opt/qqbot/config/`，数据在 `/opt/qqbot/data/`，升级 deb 不会覆盖。
+
 
 ## 命令行远程安装（无图形界面）
 

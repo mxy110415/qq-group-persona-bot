@@ -32,3 +32,8 @@ meme-pack/**/*.webp
 panel-settings.json
 instances/
 panel-bot.log
+
+# 打包产物
+build/
+dist/
+*.deb

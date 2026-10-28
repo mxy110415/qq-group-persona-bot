@@ -1,0 +1,139 @@
+name: build-release
+
+# 打 tag（v0.2.0 这种）就自动出 deb + exe 并挂到 Release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（不带 v，例如 0.2.0）"
+        required: true
+        default: "0.2.0"
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+  linux-deb:
+    name: 构建 .deb
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 版本号去掉 v 前缀
+        run: echo "VERSION=${VERSION#v}" >> "$GITHUB_ENV"
+
+      - name: 安装打包工具
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dpkg-dev
+
+      - name: 打包
+        run: bash packaging/linux/build-deb.sh
+
+      - name: 检查产物
+        run: |
+          ls -lh dist/
+          dpkg-deb -I dist/*.deb
+          dpkg-deb -c dist/*.deb | head -30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: dist/*.deb
+          if-no-files-found: error
+
+  windows-exe:
+    name: 构建 .exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装 PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+      - name: 打包单文件 exe
+        run: |
+          pyinstaller --onefile --clean --noconfirm `
+            --name QQBotPanel `
+            --add-data "panel.py;." `
+            --add-data "persona;persona" `
+            --add-data "config;config" `
+            packaging/windows/entry.py
+
+      - name: 检查产物
+        run: |
+          dir dist
+          Get-Item dist\QQBotPanel.exe | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exe
+          path: dist/QQBotPanel.exe
+          if-no-files-found: error
+
+  release:
+    name: 发布
+    needs: [linux-deb, windows-exe]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 整理产物
+        run: |
+          mkdir -p out
+          cp artifacts/deb/*.deb out/
+          cp artifacts/exe/QQBotPanel.exe out/
+          # 顺带出一个压缩包，方便整包分享
+          V="${VERSION#v}"
+          mkdir -p "bundle/qqbot-$V"
+          git archive --format=tar HEAD | tar -x -C "bundle/qqbot-$V"
+          (cd bundle && zip -qr "../out/qqbot-$V-source.zip" "qqbot-$V")
+          ls -lh out/
+
+      - name: 上传到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            ## 下载哪个？
+
+            | 系统 | 文件 | 安装方式 |
+            |---|---|---|
+            | Linux Mint / Ubuntu / Debian | `qqbot-agent_*_all.deb` | 双击安装，或 `sudo dpkg -i`，缺依赖再 `sudo apt -f install` |
+            | Windows 10/11 | `QQBotPanel.exe` | 双击运行，面板用默认浏览器打开 |
+            | 任意系统（源码） | `qqbot-*-source.zip` | 解压后 `bash bootstrap.sh` |
+
+            ### Linux 装完
+
+            ```bash
+            qqbot-panel                     # 打开面板
+            systemctl --user enable --now qqbot-panel   # 开机自启（后端）
+            ```
+
+            ### Windows 首次运行
+
+            解压到**非系统目录**（例：`D:\qqbot`）再双击，
+            配置和人格会生成在 exe 旁边。
+          files: |
+            out/*.deb
+            out/QQBotPanel.exe
+            out/*-source.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
