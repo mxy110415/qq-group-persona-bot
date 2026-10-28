@@ -671,7 +671,22 @@ PAGE = r"""<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QQ 人格机器人 · 调试面板</title>
 <style>
-:root{--bg:#101012;--card:#1b1b1f;--line:#2b2b31;--txt:#e8e8ea;--dim:#9a9aa2;--ok:#3ddc84;--bad:#ff5d5d;--acc:#6aa8ff}
+:root{
+  --bg:#101012;--card:#1b1b1f;--line:#2b2b31;--txt:#e8e8ea;--dim:#9a9aa2;
+  --ok:#3ddc84;--bad:#ff5d5d;--acc:#6aa8ff;--acc-txt:#06101f;--field:#121216;--sub:#26262c;
+}
+/* 浅色 */
+html[data-theme="light"]{
+  --bg:#f4f5f7;--card:#ffffff;--line:#e3e5ea;--txt:#1b1b21;--dim:#6a6d76;
+  --ok:#1f9d55;--bad:#d9363e;--acc:#3b7ddd;--acc-txt:#ffffff;--field:#ffffff;--sub:#eceef2;
+}
+/* 跟随系统 */
+@media (prefers-color-scheme: light){
+  html[data-theme="system"]{
+    --bg:#f4f5f7;--card:#ffffff;--line:#e3e5ea;--txt:#1b1b21;--dim:#6a6d76;
+    --ok:#1f9d55;--bad:#d9363e;--acc:#3b7ddd;--acc-txt:#ffffff;--field:#ffffff;--sub:#eceef2;
+  }
+}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.6 -apple-system,"Segoe UI","Noto Sans CJK SC",sans-serif}
 .wrap{max-width:100%;margin:0 auto;padding:16px 22px}
@@ -682,26 +697,38 @@ h1{font-size:18px;margin:0 0 4px}
 .row{display:flex;gap:12px;flex-wrap:wrap}
 .row>*{flex:1;min-width:180px}
 label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
-input,textarea,select{width:100%;background:#121216;border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit}
-select option{background:#121216;color:#e8e8ea}
+input,textarea,select{width:100%;background:var(--field);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit}
+select option{background:var(--card);color:var(--txt)}
 select{color-scheme:dark}
 input::placeholder{color:#6f6f78}
 textarea{min-height:46vh;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.65}
 button{background:var(--acc);color:#06101f;border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
-button.ghost{background:#26262c;color:var(--txt)}
+button.ghost{background:var(--sub);color:var(--txt)}
 button.danger{background:var(--bad);color:#1a0000}
 button:disabled{opacity:.45;cursor:not-allowed}
 .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#26262c;color:var(--dim)}
 .pill.ok{background:rgba(61,220,132,.14);color:var(--ok)}
 .pill.bad{background:rgba(255,93,93,.14);color:var(--bad)}
-pre{background:#0c0c0f;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;max-height:280px;font-size:12px;margin:0}
+pre{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;max-height:280px;font-size:12px;margin:0}
 img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;background:#fff;padding:6px}
 .muted{color:var(--dim);font-size:12px}
+#mask{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50}
+#mask.on{display:flex}
+#dlg{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(420px,88vw);box-shadow:0 18px 50px rgba(0,0,0,.45)}
+#dlg h3{margin:0 0 10px;font-size:15px;color:var(--txt)}
+#dlgmsg{color:var(--dim);font-size:13.5px;line-height:1.65;white-space:pre-wrap}
+#dlgbtns{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+#toast{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;flex-direction:column;gap:8px}
+.tst{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);color:var(--txt);
+  padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:in .18s ease}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.themebtn{padding:6px 10px;border-radius:8px;background:var(--sub);border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:12.5px}
+.themebtn.on{color:var(--acc);border-color:var(--acc)}
 .topnav{display:flex;gap:8px;margin:0 0 16px}
-.tnav{padding:9px 16px;border-radius:10px;background:#1b1b1f;border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:13.5px}
+.tnav{padding:9px 16px;border-radius:10px;background:var(--card);border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:13.5px}
 .tnav.on{background:rgba(106,168,255,.16);color:#cfe2ff;border-color:rgba(106,168,255,.5)}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px}
-.tab{padding:6px 12px;border-radius:8px;background:#222228;color:var(--dim);cursor:pointer;font-size:13px;border:1px solid transparent}
+.tab{padding:6px 12px;border-radius:8px;background:var(--sub);color:var(--dim);cursor:pointer;font-size:13px;border:1px solid transparent}
 .tab.on{background:rgba(106,168,255,.16);color:#cfe2ff;border-color:rgba(106,168,255,.45)}
 .field{margin-bottom:12px}
 .field .hint{font-size:11px;color:#6f6f78;margin-top:3px}
@@ -712,7 +739,16 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   <div class="tnav on" data-sec="bot" onclick="topTab('bot')">🤖 QQ 机器人</div>
   <div class="tnav" data-sec="persona" onclick="topTab('persona')">🎭 人格</div>
   <div class="tnav" data-sec="system" onclick="topTab('system')">⚙️ 系统</div>
+  <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+    <span class="muted" style="margin-right:2px">主题</span>
+    <div class="themebtn" data-t="system" onclick="setTheme('system')">跟随系统</div>
+    <div class="themebtn" data-t="dark" onclick="setTheme('dark')">深色</div>
+    <div class="themebtn" data-t="light" onclick="setTheme('light')">浅色</div>
+  </div>
 </div>
+<div id="mask"><div id="dlg"><h3 id="dlgtitle">提示</h3><div id="dlgmsg"></div>
+  <div id="dlgbtns"><button class="ghost" id="dlgno">取消</button><button id="dlgyes">确定</button></div></div></div>
+<div id="toast"></div>
 
 <div class="card" data-sec="bot"><h2>实例</h2>
   <div class="row"><div><label>选择实例</label><select id="inst"></select></div>
@@ -895,6 +931,44 @@ async function loadModels(){
 
 let SCHEMA=null, VALUES=null, CURTAB=null;
 
+/* ---------- 主题 ---------- */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('qqbot-theme', t);
+  document.querySelectorAll('.themebtn').forEach(b=>b.classList.toggle('on', b.dataset.t===t));
+}
+function setTheme(t){ applyTheme(t); toast('主题已切换：'+({system:'跟随系统',dark:'深色',light:'浅色'})[t]); }
+(function(){ const t=localStorage.getItem('qqbot-theme')||'system'; applyTheme(t); })();
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()=>{
+  if((localStorage.getItem('qqbot-theme')||'system')==='system') applyTheme('system');
+});
+
+/* ---------- 吐司 / 模态框（替代原生 alert/confirm） ---------- */
+function toast(msg){
+  const el=document.createElement('div'); el.className='tst'; el.textContent=msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .25s'; setTimeout(()=>el.remove(),260); }, 2600);
+}
+window.alert = toast;
+
+function dialog(msg, {title='提示', ok='确定', cancel=null}={}){
+  return new Promise(res=>{
+    const mask=document.getElementById('mask');
+    document.getElementById('dlgtitle').textContent=title;
+    document.getElementById('dlgmsg').textContent=msg;
+    const yes=document.getElementById('dlgyes'), no=document.getElementById('dlgno');
+    yes.textContent=ok; no.textContent=cancel||'取消';
+    no.style.display = cancel? '' : 'none';
+    const close=v=>{ mask.classList.remove('on'); yes.onclick=null; no.onclick=null; res(v); };
+    yes.onclick=()=>close(true);
+    no.onclick=()=>close(false);
+    mask.onclick=e=>{ if(e.target===mask) close(false); };
+    mask.classList.add('on');
+    yes.focus();
+  });
+}
+const confirmBox = (msg, title='请确认') => dialog(msg, {title, ok:'确定', cancel:'取消'});
+
 let TOPSEC='bot';
 function topTab(sec){
   TOPSEC=sec;
@@ -1031,7 +1105,7 @@ async function newPersona(){
 
 async function delPersona(){
   const f=$('pfile').value;
-  if(!confirm('删除人格文件 '+f+' ？')) return;
+  if(!(await confirmBox('删除人格文件 '+f+' ？','删除人格'))) return;
   try{
     const r=await j('/api/persona',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name:CUR,file:f,action:'delete'})});
@@ -1099,7 +1173,7 @@ async function toggleAutostart(on){
 }
 
 async function doUpdate(){
-  if(!confirm('从 GitHub 拉取最新代码？\n只覆盖 bot.py / panel.py / deploy 等代码文件，配置、人格、数据都不会动。')) return;
+  if(!(await confirmBox('从 GitHub 拉取最新代码？\n只覆盖 bot.py / panel.py / deploy 等代码文件，配置、人格、数据都不会动。','立即更新'))) return;
   try{
     const r=await j('/api/update/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     alert(r.message+'\n更新文件：'+(r.files||[]).join(', ')); refreshAuto();
