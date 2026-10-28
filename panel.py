@@ -1157,6 +1157,18 @@ async function boot(){
   CUR=d.instances[0]?.name; await loadState();
 }
 
+async function refreshLight(){
+  try{
+    const s=await j('/api/state?name='+encodeURIComponent(CUR));
+    STATE=s;
+    $('sub').innerHTML=`实例 <b>${s.name}</b> · ${s.bot_running?'<span class="pill ok">进程在跑</span>':'<span class="pill bad">进程未运行</span>'} · ${s.ws_ok?'<span class="pill ok">NapCat 在线</span>':'<span class="pill bad">NapCat 未连</span>'}`;
+    $('state').innerHTML=`<span class="pill">主人 ${s.owner_id||'未设'}</span> <span class="pill">称呼 ${s.owner_name||'-'}</span> <span class="pill">模型 ${s.model||'-'}</span> <span class="pill">群 ${s.groups.length} · 好友 ${s.friends.length}</span>`;
+    renderQR(s);
+  }catch(e){}
+  loadQQ();
+  loadPause();
+}
+
 async function loadState(){
   STATE=await j('/api/state?name='+encodeURIComponent(CUR));
   const s=STATE, gm=s.group_mode||{};
@@ -1172,9 +1184,11 @@ async function loadState(){
   loadLogs();
 }
 
-setInterval(()=>{ if(CUR && STATE) renderQR(STATE); }, 3000);
+let QRM=0;
 function renderQR(s){
   if(!s.qr_mtime){$('qrbox').innerHTML='<span class="muted">还没有二维码文件</span>';return}
+  if(s.qr_mtime===QRM) return;          // 没变就不重绘，避免闪烁/卡顿
+  QRM=s.qr_mtime;
   $('qrbox').innerHTML=`<img class="qr" src="/api/qr?name=${encodeURIComponent(CUR)}&t=${s.qr_mtime}">
     <div class="muted" style="margin-top:6px">生成于 ${fmt(s.qr_mtime)}</div>`;
 }
@@ -1561,7 +1575,7 @@ async function ctrl(action){
   alert(r.message||action); setTimeout(loadState,800);
 }
 boot(); loadAbout();
-topTab(new URLSearchParams(location.search).get('tab') || 'bot'); refreshAuto(); loadSettings(); setInterval(()=>{if(TOPSEC==='bot')loadQQ()},8000); setInterval(()=>{if(CUR)loadState()},8000);
+topTab(new URLSearchParams(location.search).get('tab') || 'bot'); refreshAuto(); loadSettings(); setInterval(()=>{if(CUR)refreshLight()},5000); 
 </script></body></html>"""
 
 
@@ -1631,6 +1645,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"name": APP_NAME, "author": APP_AUTHOR, "version": APP_VERSION,
                                "build": local_version() or "-", "repo": REPO_URL,
                                "releases": RELEASES_URL, "issues": ISSUES_URL})
+        if u.path == "/api/theme":
+            inst = self._inst(name)
+            tf = os.path.join(instance_home(inst), "data", ".theme")
+            try:
+                with open(tf, encoding="utf-8") as f:
+                    return self._json({"theme": f.read().strip() or "system"})
+            except Exception:
+                return self._json({"theme": "system"})
         if u.path == "/api/pause":
             inst = self._inst(name)
             return self._json({"paused": pause_state(instance_home(inst))})
@@ -1849,6 +1871,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"message": "已在浏览器打开：" + url})
             except Exception as e:
                 return self._json({"error": "打不开：%s" % str(e)[:100]}, 500)
+
+        if u.path == "/api/theme":
+            t = body.get("theme") or "system"
+            if t not in ("system", "dark", "light"):
+                t = "system"
+            os.makedirs(os.path.join(home, "data"), exist_ok=True)
+            with open(os.path.join(home, "data", ".theme"), "w", encoding="utf-8") as f:
+                f.write(t)
+            return self._json({"message": "主题已保存", "theme": t})
 
         if u.path == "/api/pause":
             st = set_pause(home, bool(body.get("paused")))
