@@ -1,0 +1,81 @@
+{
+  "napcat_ws": "ws://127.0.0.1:3000",
+  "ws_token": "REPLACE_WITH_YOUR_NAPCAT_TOKEN",
+  "api": {
+    "base_url": "https://api.deepseek.com",
+    "key": "sk-REPLACE_ME",
+    "model": "deepseek-flash"
+  },
+  "persona": "",
+  "owner_id": "",
+  "admins": [],
+  "name_triggers": [
+    "伊蕾娜",
+    "魔女"
+  ],
+  "topic_triggers": [],
+  "affinity_cmds": [
+    "/好感度",
+    "/好感"
+  ],
+  "quiet_groups": [],
+  "limits": {
+    "max_history_turns": 8,
+    "per_user_per_minute": 5,
+    "reply_max_chars": 300,
+    "request_timeout_s": 60,
+    "temperature": 0.9,
+    "compress_chars": 2500,
+    "keep_recent": 4
+  },
+  "group_mode": {
+    "enabled": true,
+    "chance": 0.08,
+    "min_gap_s": 900,
+    "max_gap_s": 2700,
+    "max_per_hour": 3,
+    "max_per_minute": 3,
+    "quiet_hours": [
+      2,
+      7
+    ],
+    "reply_window_s": 90,
+    "max_consecutive": 3
+  },
+  "proactive": {
+    "enabled": false,
+    "continue_enabled": true,
+    "timer_enabled": true,
+    "min_gap_s": 2400,
+    "max_gap_s": 5400,
+    "continue_idle_s": 600,
+    "continue_window_s": 3600,
+    "max_per_day": 4,
+    "after_speak_s": 1200,
+    "quiet_hours": [
+      2,
+      7
+    ]
+  },
+  "cost": {
+    "usd_to_cny": 7.2,
+    "price_hit": [
+      0.003,
+      0.006
+    ],
+    "price_miss": [
+      0.15,
+      0.3
+    ],
+    "price_out": [
+      0.6,
+      1.2
+    ],
+    "report_hour": 22,
+    "report_minute": 30
+  },
+  "meme_dir": "/home/xr/apps/qqbot/meme-pack",
+  "owner_only_triggers": [
+    "老婆"
+  ]
+}

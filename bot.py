@@ -30,9 +30,14 @@ from websockets.asyncio.client import connect
 TZ_CN = timezone(timedelta(hours=8))
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-CFG_PATH = os.path.join(BASE, "config.json")
-WL_PATH = os.path.join(BASE, "whitelist.json")
-AFF_PATH = os.path.join(BASE, "affinity.json")
+CONF_DIR = os.path.join(BASE, "config")
+DATA_DIR = os.path.join(BASE, "data")
+PERSONA_DIR = os.path.join(BASE, "persona")
+for _d in (CONF_DIR, DATA_DIR, PERSONA_DIR):
+    os.makedirs(_d, exist_ok=True)
+CFG_PATH = os.path.join(CONF_DIR, "config.json")
+WL_PATH = os.path.join(CONF_DIR, "whitelist.json")
+AFF_PATH = os.path.join(DATA_DIR, "affinity.json")
 
 with open(CFG_PATH, encoding="utf-8") as f:
     CFG = json.load(f)
@@ -42,7 +47,12 @@ WS_TOKEN = CFG["ws_token"]
 API_BASE = CFG["api"]["base_url"]
 API_KEY = CFG["api"]["key"]
 MODEL = CFG["api"]["model"]
-PERSONA = CFG["persona"]
+_PERSONA_FILE = os.path.join(PERSONA_DIR, "persona.txt")
+if os.path.exists(_PERSONA_FILE):
+    with open(_PERSONA_FILE, encoding="utf-8") as _f:
+        PERSONA = _f.read().strip()
+else:
+    PERSONA = CFG["persona"]
 LIMITS = CFG["limits"]
 GM = CFG.get("group_mode", {})
 
@@ -78,7 +88,7 @@ G_MAX_PER_HOUR = int(GM.get("max_per_hour", 3))
 G_QUIET = GM.get("quiet_hours", [2, 7])
 
 # ============ 敏感内容硬过滤（政治/违法/色情）============
-SENS_PATH = os.path.join(BASE, "sensitive.json")
+SENS_PATH = os.path.join(DATA_DIR, "sensitive.json")
 _SENS_CACHE = {"ts": 0.0, "words": [], "lines": []}
 
 
@@ -124,7 +134,7 @@ def safe_deflect():
 ADMIN_QQ = str(CFG.get("owner_id", "") or "")
 
 # ============ 群级独立配置（每群可单独调） ============
-GC_PATH = os.path.join(BASE, "group_configs.json")
+GC_PATH = os.path.join(CONF_DIR, "group_configs.json")
 DEFAULT_GROUP_CFG = {
     "interject_prob": None,      # None = 用全局 G_CHANCE
     "enable_interject": True,    # 是否允许随机插嘴
@@ -318,7 +328,7 @@ async def call_action(ws, action, params, timeout=2.0):
 
 
 # ============ 用户画像 / 链接解析 / 消息增强 ============
-USER_MEM_PATH = os.path.join(BASE, "user_memory.json")
+USER_MEM_PATH = os.path.join(DATA_DIR, "user_memory.json")
 _UM_LOCK = threading.Lock()
 _LINK_RE = re.compile(r"https?://[^\s，。；、）】》\"']+")
 _LINK_HOSTS = ("bilibili.com", "b23.tv", "douyin.com", "v.douyin.com",
@@ -989,7 +999,7 @@ PRICE_MISS = COST.get("price_miss", [0.15, 0.3])
 PRICE_OUT = COST.get("price_out", [0.6, 1.2])
 REPORT_HOUR = int(COST.get("report_hour", 22))
 REPORT_MINUTE = int(COST.get("report_minute", 30))
-TOK_PATH = os.path.join(BASE, "tokens.json")
+TOK_PATH = os.path.join(DATA_DIR, "tokens.json")
 _TOK_LOCK = threading.Lock()
 
 

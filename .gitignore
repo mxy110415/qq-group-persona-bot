@@ -1,12 +1,17 @@
 # 真实配置（含密钥/QQ号/token）
-config.json
-whitelist.json
-group_configs.json
-affinity.json
-tokens.json
-user_memory.json
+config/config.json
+config/whitelist.json
+config/group_configs.json
+config/*.json
+!config/*.example.json
+# 运行状态
+data/*.json
+!data/sensitive.json
+# 密钥与凭据
 .env
 *.env
+*.pem
+*.key
 # 运行产物
 *.log
 *.tmp
@@ -15,6 +20,8 @@ __pycache__/
 # QQ 客户端副本与登录态
 QQn/
 qqdata/
+napcat/
+napcat-shell/
 # 表情包图片
 meme-pack/**/*.jpg
 meme-pack/**/*.png

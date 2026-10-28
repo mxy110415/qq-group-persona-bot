@@ -67,6 +67,24 @@ QQ 客户端（LinuxQQ）
 
 ---
 
+## 目录结构
+
+```
+bot.py                      主程序（唯一入口）
+persona/
+  persona.txt               人格设定（纯文本，想换成谁就改成谁）
+config/
+  config.example.json       主配置示例（API、模型、行为参数）
+  whitelist.example.json    群/私聊白名单示例
+  group_configs.example.json 群级配置示例
+data/
+  sensitive.json            敏感词库（8 类，可直接改）
+```
+
+运行时会在同目录生成 `config/config.json`、`config/whitelist.json`、`data/affinity.json` 等真实文件（已在 `.gitignore` 里）。
+
+---
+
 ## 快速开始
 
 ### 前置
@@ -80,10 +98,12 @@ QQ 客户端（LinuxQQ）
 ### 配置
 
 ```bash
-cp config.example.json config.json
-cp whitelist.example.json whitelist.json
-cp group_configs.example.json group_configs.json
+cp config/config.example.json config/config.json
+cp config/whitelist.example.json config/whitelist.json
+cp config/group_configs.example.json config/group_configs.json
 ```
+
+人格直接改 `persona/persona.txt`（纯文本，无需转义，重启或重新运行生效）。
 
 `config.json` 里必填：
 
@@ -96,7 +116,8 @@ cp group_configs.example.json group_configs.json
 | `admins` | 管理员 QQ 号数组 |
 | `napcat_ws` | NapCat 的 WebSocket 地址 |
 | `ws_token` | NapCat 配置里的 token |
-| `persona` | 人格设定（纯文本，想改成谁就改成谁） |
+
+> 人格不在这里：改 `persona/persona.txt` 即可，程序启动时优先读它（文件不存在才回落到 `config.json` 的 `persona` 字段）。
 
 ### 白名单
 
