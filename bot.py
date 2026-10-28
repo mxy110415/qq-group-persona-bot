@@ -48,7 +48,8 @@ API_BASE = CFG["api"]["base_url"]
 API_KEY = CFG["api"]["key"]
 MODEL = CFG["api"]["model"]
 OWNER_NAME = CFG.get("owner_name") or "主人"
-_PERSONA_FILE = os.path.join(PERSONA_DIR, "persona.txt")
+# 支持多套人格：config.persona_file 指定 persona/ 下的文件名
+_PERSONA_FILE = os.path.join(PERSONA_DIR, CFG.get("persona_file") or "persona.txt")
 if os.path.exists(_PERSONA_FILE):
     with open(_PERSONA_FILE, encoding="utf-8") as _f:
         PERSONA = _f.read().strip()

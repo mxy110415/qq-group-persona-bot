@@ -94,6 +94,27 @@ Linux 上要开机（未登录桌面）也能跑用户服务，需要一次：
 sudo loginctl enable-linger $USER
 ```
 
+### 多套人格
+
+`persona/` 下可以放任意多个 `.txt`，面板里：
+
+```
+下拉选择  当前编辑哪一套
+新建      起个名字就生成一个空文件
+保存      写回当前文件
+保存并启用 写回并把 config.persona_file 指向它（重启 bot 生效）
+删除      删掉这一套（默认 persona.txt 不允许删）
+云端导入  填 https 地址，直接下载别人/自己仓库里的人格
+```
+
+配置里对应一个字段：
+
+```json
+{ "persona_file": "persona.txt" }
+```
+
+改它等于切人格，`bot.py` 启动时按这个文件名读 `persona/` 下的文件。
+
 ### 桌面应用形态（推荐）
 
 不想开浏览器？用 `panel_app.py` 把面板包成原生窗口（GTK + WebKit2）：

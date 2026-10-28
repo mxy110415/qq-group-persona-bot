@@ -78,5 +78,6 @@
   "owner_only_triggers": [
     "老婆"
   ],
-  "owner_name": "主人"
+  "owner_name": "主人",
+  "persona_file": "persona.txt"
 }

@@ -256,6 +256,26 @@ def save_settings(d):
     os.replace(tmp, SETTINGS_FILE)
 
 
+def fetch_url(url, timeout=20, headers=None):
+    """先直连；失败则试本机常见代理端口（7897/7890）。返回 bytes。"""
+    import urllib.request
+    hdrs = headers or {"User-Agent": "qqbot-panel"}
+    last = None
+    for proxy in (None, "http://127.0.0.1:7897", "http://127.0.0.1:7890"):
+        if proxy and not port_open("127.0.0.1", int(proxy.rsplit(":", 1)[1])):
+            continue
+        try:
+            handler = urllib.request.ProxyHandler({} if proxy is None else {"http": proxy, "https": proxy})
+            opener = urllib.request.build_opener(handler)
+            req = urllib.request.Request(url, headers=hdrs)
+            with opener.open(req, timeout=timeout) as r:
+                return r.read()
+        except Exception as e:
+            last = e
+            continue
+    raise last if last else RuntimeError("unknown error")
+
+
 def paths_info():
     st = load_settings()
     inst_dir = os.path.join(ROOT, st.get("instances_dir") or "instances")
@@ -387,13 +407,10 @@ def local_version():
 
 def remote_version():
     try:
-        import urllib.request
-        req = urllib.request.Request(
-            "https://api.github.com/repos/%s/commits/%s" % (REPO, BRANCH),
-            headers={"User-Agent": "qqbot-panel", "Accept": "application/vnd.github+json"})
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        with opener.open(req, timeout=15) as r:
-            d = json.loads(r.read().decode("utf-8", "ignore"))
+        raw = fetch_url("https://api.github.com/repos/%s/commits/%s" % (REPO, BRANCH),
+                        timeout=15,
+                        headers={"User-Agent": "qqbot-panel", "Accept": "application/vnd.github+json"})
+        d = json.loads(raw.decode("utf-8", "ignore"))
         return {"sha": d.get("sha", "")[:12],
                 "date": (d.get("commit", {}).get("committer", {}) or {}).get("date", ""),
                 "message": (d.get("commit", {}).get("message", "") or "").splitlines()[0]}
@@ -406,9 +423,7 @@ def apply_update(sha):
     import tarfile
     import urllib.request
     url = "https://codeload.github.com/%s/tar.gz/refs/heads/%s" % (REPO, BRANCH)
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    with opener.open(url, timeout=60) as r:
-        raw = r.read()
+    raw = fetch_url(url, timeout=90)
     tf = tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz")
     members = tf.getmembers()
     root_dirs = {m.name.split("/")[0] for m in members if "/" in m.name}
@@ -443,7 +458,7 @@ PAGE = r"""<!doctype html>
 :root{--bg:#101012;--card:#1b1b1f;--line:#2b2b31;--txt:#e8e8ea;--dim:#9a9aa2;--ok:#3ddc84;--bad:#ff5d5d;--acc:#6aa8ff}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.6 -apple-system,"Segoe UI","Noto Sans CJK SC",sans-serif}
-.wrap{max-width:1000px;margin:0 auto;padding:20px}
+.wrap{max-width:100%;margin:0 auto;padding:16px 22px}
 h1{font-size:18px;margin:0 0 4px}
 .sub{color:var(--dim);font-size:12px;margin-bottom:18px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
@@ -452,7 +467,7 @@ h1{font-size:18px;margin:0 0 4px}
 .row>*{flex:1;min-width:180px}
 label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
 input,textarea,select{width:100%;background:#121216;border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit}
-textarea{min-height:170px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+textarea{min-height:46vh;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.65}
 button{background:var(--acc);color:#06101f;border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
 button.ghost{background:#26262c;color:var(--txt)}
 button.danger{background:var(--bad);color:#1a0000}
@@ -515,11 +530,24 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 </div>
 
 <div class="card"><h2>人格</h2>
-  <textarea id="persona" spellcheck="false"></textarea>
-  <div style="margin-top:12px;display:flex;gap:8px">
-    <button onclick="savePersona()">保存人格</button>
-    <button class="ghost" onclick="loadState()">重新读取</button>
+  <div class="row" style="align-items:flex-end">
+    <div style="flex:2"><label>当前编辑的人格文件</label><select id="pfile" onchange="switchPersona()"></select></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="ghost" onclick="newPersona()">新建</button>
+      <button onclick="savePersona(false)">保存</button>
+      <button onclick="savePersona(true)">保存并启用</button>
+      <button class="danger" onclick="delPersona()">删除</button>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px;align-items:flex-end">
+    <div style="flex:2"><label>从云端人格导入（https 地址）</label>
+      <input id="purl" value="https://raw.githubusercontent.com/mxy110415/qq-group-persona-bot/main/persona/persona.txt"></div>
+    <div><button class="ghost" onclick="pullPersona()">拉取并保存</button></div>
+  </div>
+  <textarea id="persona" spellcheck="false" style="margin-top:12px"></textarea>
+  <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
     <span class="muted" id="plen"></span>
+    <span class="muted" id="pactive"></span>
   </div>
 </div>
 
@@ -595,9 +623,7 @@ async function loadState(){
   $('groups').value=(s.groups||[]).join(',');
   $('friends').value=(s.friends||[]).join(',');
   renderQR(s);
-  const p=await j('/api/persona?name='+encodeURIComponent(CUR));
-  $('persona').value=p.text||'';
-  $('plen').textContent=`${(p.text||'').length} 字`;
+  await loadPersonas();
   loadLogs();
 }
 
@@ -632,11 +658,54 @@ async function saveWhitelist(){
   alert(r.message||'已保存'); loadState();
 }
 
-async function savePersona(){
+async function loadPersonas(select){
+  const d=await j('/api/personas?name='+encodeURIComponent(CUR));
+  $('pfile').innerHTML=d.files.map(f=>`<option value="${f}"${f===(select||d.active)?' selected':''}>${f}${f===d.active?'（启用中）':''}</option>`).join('');
+  $('pactive').textContent='当前启用：'+d.active;
+  await switchPersona(select||d.active);
+}
+
+async function switchPersona(f){
+  const file=f||$('pfile').value;
+  const d=await j('/api/persona?name='+encodeURIComponent(CUR)+'&file='+encodeURIComponent(file));
+  $('persona').value=d.text||'';
+  $('plen').textContent=(d.text||'').length+' 字';
+}
+
+async function savePersona(activate){
   const r=await j('/api/persona',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name:CUR,text:$('persona').value})});
+    body:JSON.stringify({name:CUR,file:$('pfile').value,text:$('persona').value,activate:!!activate})});
   alert(r.message||'已保存');
-  if(r.restarted) loadState();
+  await loadPersonas($('pfile').value);
+}
+
+async function newPersona(){
+  const n=prompt('新人格文件名（例如 温柔版）');
+  if(!n) return;
+  const r=await j('/api/persona',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:CUR,file:n+'.txt',text:'',action:'create'})});
+  alert(r.message||'已创建'); await loadPersonas(n+'.txt');
+}
+
+async function delPersona(){
+  const f=$('pfile').value;
+  if(!confirm('删除人格文件 '+f+' ？')) return;
+  try{
+    const r=await j('/api/persona',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:CUR,file:f,action:'delete'})});
+    alert(r.message); await loadPersonas();
+  }catch(e){alert('失败：'+e.message)}
+}
+
+async function pullPersona(){
+  const url=$('purl').value.trim();
+  if(!url) return alert('填个地址');
+  const name=(prompt('保存为文件名（不含 .txt）','云端人格')||'云端人格')+'.txt';
+  try{
+    const r=await j('/api/persona',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:CUR,file:name,url,action:'pull'})});
+    alert(r.message); await loadPersonas(name);
+  }catch(e){alert('拉取失败：'+e.message)}
 }
 
 async function newInst(){
@@ -766,16 +835,29 @@ class Handler(BaseHTTPRequestHandler):
             with open(qr, "rb") as f:
                 data = f.read()
             return self._send(200, data, "image/png")
+        if u.path == "/api/personas":
+            inst = self._inst(name)
+            home = instance_home(inst)
+            pdir = os.path.join(home, "persona")
+            os.makedirs(pdir, exist_ok=True)
+            files = sorted(f for f in os.listdir(pdir) if f.endswith(".txt"))
+            cfg = read_json(os.path.join(home, "config", "config.json"), {}) or {}
+            return self._json({"files": files,
+                               "active": cfg.get("persona_file") or "persona.txt"})
         if u.path == "/api/persona":
             inst = self._inst(name)
             if not inst:
                 return self._json({"error": "没有实例"}, 404)
-            p = os.path.join(instance_home(inst), "persona", "persona.txt")
+            home = instance_home(inst)
+            cfg = read_json(os.path.join(home, "config", "config.json"), {}) or {}
+            fname = (q.get("file") or [None])[0] or cfg.get("persona_file") or "persona.txt"
+            fname = os.path.basename(fname)
+            p = os.path.join(home, "persona", fname)
             text = ""
             if os.path.exists(p):
                 with open(p, encoding="utf-8") as f:
                     text = f.read()
-            return self._json({"text": text, "path": p})
+            return self._json({"text": text, "path": p, "file": fname})
         if u.path == "/api/settings":
             st = load_settings()
             st["_last_check"] = dict(_last_check)
@@ -914,18 +996,56 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"message": "白名单已保存（立即生效，无需重启）"})
 
         if u.path == "/api/persona":
-            path = os.path.join(home, "persona", "persona.txt")
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+            pdir = os.path.join(home, "persona")
+            os.makedirs(pdir, exist_ok=True)
+            fname = os.path.basename(body.get("file") or "persona.txt")
+            if not fname.endswith(".txt"):
+                fname += ".txt"
+            action = body.get("action") or "save"
+            path = os.path.join(pdir, fname)
+
+            if action == "delete":
+                if fname == "persona.txt":
+                    return self._json({"error": "默认人格不能删除"}, 400)
+                if os.path.exists(path):
+                    os.remove(path)
+                return self._json({"message": "已删除 %s" % fname})
+
+            if action == "pull":
+                import urllib.request
+                url = (body.get("url") or "").strip()
+                if not url.startswith("https://"):
+                    return self._json({"error": "只接受 https 地址"}, 400)
+                try:
+                    text = fetch_url(url, timeout=25).decode("utf-8", "ignore")
+                except Exception as e:
+                    return self._json({"error": "下载失败：" + str(e)[:120]}, 502)
+                if len(text.strip()) < 20:
+                    return self._json({"error": "内容太短，可能不是人格文件"}, 400)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                return self._json({"message": "已从云端保存为 %s（%d 字）" % (fname, len(text)), "file": fname})
+
+            # save / create
+            text = body.get("text", "")
+            if action == "create" and os.path.exists(path):
+                return self._json({"error": "同名人格已存在"}, 400)
+            # 防呆：已有文件被写成空/极短内容时拒绝（避免误清空人格）
+            if action != "create" and len(text.strip()) < 20 and os.path.exists(path):
+                return self._json({"error": "内容太短（%d 字），已拒绝保存，防止误清空人格" % len(text.strip())}, 400)
             tmp = path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                f.write(body.get("text", ""))
+                f.write(text)
             os.replace(tmp, path)
-            restarted = False
-            if proc_alive(_procs.get(inst["name"])):
-                stop_instance(inst["name"])
-                start_instance(inst["name"])
-                restarted = True
-            return self._json({"message": "人格已保存" + ("，已重启机器人" if restarted else ""), "restarted": restarted})
+
+            if body.get("activate"):
+                cfg = read_json(os.path.join(home, "config", "config.json"), {}) or {}
+                cfg["persona_file"] = fname
+                write_json(os.path.join(home, "config", "config.json"), cfg)
+                if proc_alive(_procs.get(inst["name"])):
+                    stop_instance(inst["name"])
+                    start_instance(inst["name"])
+            return self._json({"message": "已保存 %s" % fname, "file": fname})
 
         if u.path == "/api/control":
             action = body.get("action")
