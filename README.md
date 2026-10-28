@@ -204,6 +204,56 @@ meme-pack/
 
 ---
 
+## 命令行远程安装（无图形界面）
+
+### Linux / WSL / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mxy110415/qq-group-persona-bot/main/bootstrap.sh | bash
+```
+
+指定目录：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mxy110415/qq-group-persona-bot/main/bootstrap.sh | bash -s -- ~/bots/qqbot
+```
+
+国内网络先设代理再跑：
+
+```bash
+export https_proxy=http://127.0.0.1:7897
+curl -fsSL https://raw.githubusercontent.com/mxy110415/qq-group-persona-bot/main/bootstrap.sh | bash
+```
+
+脚本会：下载 launcher.py → 拉源码包 → 建 venv → 装 websockets → 生成配置。
+全程不弹窗，适合服务器。
+
+装完常驻：
+
+```bash
+cd ~/qq-group-persona-bot
+nohup ./.venv/bin/python panel.py --port 6100 > panel.log 2>&1 &
+nohup ./.venv/bin/python bot.py > bot.log 2>&1 &
+```
+
+或者用 `deploy/*.service` 装 systemd。
+
+### Windows（PowerShell，命令行）
+
+```powershell
+irm https://raw.githubusercontent.com/mxy110415/qq-group-persona-bot/main/launcher.py -OutFile "$env:TEMP\qqbot-launcher.py"
+py "$env:TEMP\qqbot-launcher.py" --dir "$env:USERPROFILE\qqbot" --yes
+```
+
+装完启动：
+
+```powershell
+cd "$env:USERPROFILE\qqbot"
+.\.venv\Scripts\python.exe panel.py --port 6100
+```
+
+---
+
 ## 下载与安装（启动器）
 
 不用命令行、不用脚本。仓库根目录的 **`launcher.py`** 就是入口：
