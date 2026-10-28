@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=QQ 机器人面板
+Comment=调试面板：扫码登录、说话节奏、白名单、人格、多开
+Exec=/usr/bin/python3 /path/to/qq-group-persona-bot/panel_app.py
+Icon=/path/to/qq-group-persona-bot/panel-icon.svg
+Terminal=false
+StartupNotify=true
+Categories=Utility;Development;

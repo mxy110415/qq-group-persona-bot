@@ -94,6 +94,27 @@ Linux 上要开机（未登录桌面）也能跑用户服务，需要一次：
 sudo loginctl enable-linger $USER
 ```
 
+### 桌面应用形态（推荐）
+
+不想开浏览器？用 `panel_app.py` 把面板包成原生窗口（GTK + WebKit2）：
+
+```bash
+python3 panel_app.py
+```
+
+它会先确保后台服务在跑，再打开一个 1120×840 的窗口，标题「QQ 群聊人格机器人 · 调试面板」。
+缺 WebKit 时会自动退回默认浏览器打开。
+
+放桌面快捷方式：
+
+```bash
+cp deploy/qqbot-panel.desktop ~/桌面/QQ机器人面板.desktop
+chmod +x ~/桌面/QQ机器人面板.desktop
+```
+
+> Linux 桌面首次双击若提示「不受信任」，右键 →「允许启动」；
+> Windows 直接双击 `panel_app.py`（需要 Python 环境）或在启动文件夹放个快捷方式。
+
 ### 安全
 - **敏感词硬过滤**（不是靠模型自觉）：政治人物、敏感事件、分裂主张、违法违禁、色情低俗等 8 类
 - **输入 / 输出双向拦截**：群聊命中完全静默，私聊一句岔开；日志只记「命中已拦截」，不落原文
