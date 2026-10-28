@@ -735,6 +735,7 @@ APP_VERSION = "v0.1.0"
 REPO_URL = "https://github.com/" + REPO
 RELEASES_URL = REPO_URL + "/releases"
 ISSUES_URL = REPO_URL + "/issues"
+PANEL_SELF_URL = "http://127.0.0.1:6100/"
 BRANCH = "main"
 VERSION_FILE = os.path.join(ROOT, "data", ".version")
 UPDATE_FILES = ["bot.py", "panel.py", "README.md", "LICENSE", "deploy", "meme-pack/README.md"]
@@ -1085,6 +1086,7 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
     </div>
     <div class="muted" style="margin-top:8px" id="fbuild">—</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <a class="fbtn" href="#" onclick="return openPanelInBrowser()">在系统浏览器中打开面板</a>
       <a class="fbtn" id="flink-repo" href="#" onclick="return openUrl('repo')">GitHub 仓库</a>
       <a class="fbtn" id="flink-rel" href="#" onclick="return openUrl('rel')">版本发布</a>
       <a class="fbtn" id="flink-iss" href="#" onclick="return openUrl('iss')">问题反馈</a>
@@ -1286,6 +1288,15 @@ async function openQQ(){
 }
 
 /* ---------- 暂停 / 试聊 / 数据 / 表情包 / 备份 ---------- */
+async function openPanelInBrowser(){
+  try{
+    await j('/api/open-url',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url:'http://127.0.0.1:6100/'})});
+    toast('已在系统浏览器打开面板');
+  }catch(e){ toast('打开失败：'+e.message); }
+  return false;
+}
+
 async function openUrl(kind){
   let url = '';
   try{
@@ -1857,7 +1868,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if u.path == "/api/open-url":
             url = (body.get("url") or "").strip()
-            allowed = (REPO_URL, RELEASES_URL, ISSUES_URL)
+            allowed = (REPO_URL, RELEASES_URL, ISSUES_URL, "http://127.0.0.1:6100/", PANEL_SELF_URL)
             if url not in allowed:
                 return self._json({"error": "只允许打开本项目的 GitHub 页面"}, 400)
             try:

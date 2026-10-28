@@ -86,6 +86,10 @@ def system_prefers_dark():
 def main():
     ensure_backend()
 
+    if os.environ.get("QQBOT_PANEL_MODE", "").lower() == "browser":
+        subprocess.Popen(["xdg-open", PANEL_URL] if os.name != "nt" else ["cmd", "/c", "start", PANEL_URL])
+        return
+
     import gi
     gi.require_version("Gtk", "3.0")
     gi.require_version("WebKit2", "4.1")
