@@ -230,6 +230,70 @@ def tail(path, n=120):
 
 
 
+
+# ---------------------------------------------------------------- 机器人进程控制
+BOT_UNITS_USER = "qqbot-bot.service"
+BOT_UNITS_SYSTEM = "qqbot-client.service"
+
+
+def systemd_do(scope, action, unit):
+    cmd = ["systemctl"] + (["--user"] if scope == "user" else []) + [action, unit]
+    code, out = _run(cmd, timeout=30)
+    return code == 0, (out or "").strip()
+
+
+def start_instance_by_dir(home):
+    if not os.path.exists(os.path.join(home, "config", "config.json")):
+        return False, "缺配置：%s/config/config.json" % home
+    env = dict(os.environ, QQBOT_HOME=home, PYTHONUNBUFFERED="1")
+    log = open(os.path.join(home, "panel-bot.log"), "ab")
+    pr = subprocess.Popen([PY, os.path.join(ROOT, "bot.py")], cwd=home, env=env,
+                          stdout=log, stderr=subprocess.STDOUT)
+    return True, "已启动（PID %d）" % pr.pid
+
+
+def bot_process_control(home, action):
+    """优先 systemd；系统级服务缺权限时只报错，不杀进程（避免被 Restart 拉起成双实例）"""
+    # 1) 用户级服务
+    if os.path.exists(os.path.expanduser("~/.config/systemd/user/" + BOT_UNITS_USER)):
+        ok, out = systemd_do("user", action, BOT_UNITS_USER)
+        return ok, "%s %s：%s" % (action, BOT_UNITS_USER, "成功" if ok else "失败 " + out[:80])
+
+    # 2) 系统级服务：先看它是否存在（show 不需要 root）
+    code, frag = _run(["systemctl", "show", "-p", "FragmentPath", "--value", BOT_UNITS_SYSTEM])
+    exists = code == 0 and BOT_UNITS_SYSTEM in (frag or "")
+    if exists:
+        ok, out = systemd_do("system", action, BOT_UNITS_SYSTEM)
+        if ok:
+            return True, "%s %s：成功" % (action, BOT_UNITS_SYSTEM)
+        return False, ("%s %s 需要管理员权限（面板没有 sudo）。\n"
+                       "要么用 sudo systemctl %s %s，要么按 README 把机器人迁移成用户级服务。"
+                       % (action, BOT_UNITS_SYSTEM, action, BOT_UNITS_SYSTEM))
+
+    # 3) 裸进程
+    pids = detect_bot_pids(home)
+    if action in ("stop", "restart") and pids:
+        for pid in pids:
+            try:
+                os.kill(pid, 15)
+            except Exception:
+                pass
+        time.sleep(1.5)
+        if action == "stop":
+            return True, "已停止"
+    if action in ("start", "restart"):
+        # 有 systemd 单元（用户级或系统级）优先交给 systemd，保证机器人不跟面板同生共死
+        for scope, unit in (("user", BOT_UNITS_USER), ("system", BOT_UNITS_SYSTEM)):
+            c, f = _run(["systemctl"] + (["--user"] if scope == "user" else []) +
+                        ["show", "-p", "FragmentPath", "--value", unit])
+            if c == 0 and unit in (f or ""):
+                ok, out = systemd_do(scope, "start", unit)
+                if ok:
+                    return True, "已通过 %s 启动 %s" % ("user systemd" if scope == "user" else "systemd", unit)
+        return start_instance_by_dir(home)
+    return (True, "没有在运行") if action == "stop" else (False, "未知操作")
+
+
 # ---------------------------------------------------------------- QQ 账号 / 窗口
 def ffmpeg_path():
     import shutil as _sh
@@ -1558,13 +1622,21 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/control":
             action = body.get("action")
             if action == "start":
-                ok, msg = start_instance(inst["name"])
+                if detect_bot_pids(home) or proc_alive(_procs.get(inst["name"])):
+                    ok, msg = True, "已在运行"
+                else:
+                    ok, msg = bot_process_control(home, "start")
             elif action == "stop":
-                ok, msg = stop_instance(inst["name"])
+                if proc_alive(_procs.get(inst["name"])):
+                    ok, msg = stop_instance(inst["name"])
+                else:
+                    ok, msg = bot_process_control(home, "stop")
             elif action == "restart":
-                stop_instance(inst["name"])
-                time.sleep(0.5)
-                ok, msg = start_instance(inst["name"])
+                if proc_alive(_procs.get(inst["name"])):
+                    stop_instance(inst["name"]); time.sleep(0.5)
+                    ok, msg = start_instance(inst["name"])
+                else:
+                    ok, msg = bot_process_control(home, "restart")
             else:
                 return self._json({"error": "未知操作"}, 400)
             return self._json({"ok": ok, "message": msg}, 200 if ok else 400)
