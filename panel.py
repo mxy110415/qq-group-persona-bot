@@ -229,6 +229,138 @@ def tail(path, n=120):
         return "读取日志失败: %s" % e
 
 
+# ---------------------------------------------------------------- 自启 / 更新
+REPO = "mxy110415/qq-group-persona-bot"
+BRANCH = "main"
+VERSION_FILE = os.path.join(ROOT, "data", ".version")
+UPDATE_FILES = ["bot.py", "panel.py", "README.md", "LICENSE", "deploy", "meme-pack/README.md"]
+
+
+def _run(cmd, timeout=30):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout or "") + (r.stderr or "")
+    except Exception as e:
+        return 1, str(e)
+
+
+def autostart_state():
+    if os.name == "nt":
+        startup = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup")
+        lnk = os.path.join(startup, "qqbot-panel.lnk")
+        return {"supported": True, "enabled": os.path.exists(lnk), "detail": "启动文件夹快捷方式"}
+    unit = os.path.expanduser("~/.config/systemd/user/qqbot-panel.service")
+    enabled = False
+    if os.path.exists(unit):
+        code, out = _run(["systemctl", "--user", "is-enabled", "qqbot-panel.service"])
+        enabled = code == 0 and "enabled" in out
+    return {"supported": True, "enabled": enabled, "detail": "systemd 用户服务"}
+
+
+def autostart_set(on):
+    if os.name == "nt":
+        startup = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup")
+        os.makedirs(startup, exist_ok=True)
+        lnk = os.path.join(startup, "qqbot-panel.lnk")
+        if on:
+            ps = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%s');"
+                  "$s.TargetPath='%s';$s.Arguments='%s --port 6100';$s.WorkingDirectory='%s';$s.Save()"
+                  % (lnk.replace("'", "''"), PY, os.path.join(ROOT, "panel.py"), ROOT))
+            _run(["powershell", "-NoProfile", "-Command", ps])
+        elif os.path.exists(lnk):
+            os.remove(lnk)
+        return autostart_state()
+
+    unit_dir = os.path.expanduser("~/.config/systemd/user")
+    os.makedirs(unit_dir, exist_ok=True)
+    unit = os.path.join(unit_dir, "qqbot-panel.service")
+    if on:
+        with open(unit, "w", encoding="utf-8") as f:
+            f.write("""[Unit]
+Description=QQ Persona Bot Panel
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%s
+ExecStart=%s %s --port 6100
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+""" % (ROOT, PY, os.path.join(ROOT, "panel.py")))
+        _run(["systemctl", "--user", "daemon-reload"])
+        code, out = _run(["systemctl", "--user", "enable", "--now", "qqbot-panel.service"])
+        if code != 0:
+            return {"supported": True, "enabled": False, "detail": "启用失败：" + out.strip()[:120]}
+    else:
+        _run(["systemctl", "--user", "disable", "--now", "qqbot-panel.service"])
+        if os.path.exists(unit):
+            os.remove(unit)
+        _run(["systemctl", "--user", "daemon-reload"])
+    return autostart_state()
+
+
+def local_version():
+    if os.path.exists(VERSION_FILE):
+        try:
+            with open(VERSION_FILE, encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+    return ""
+
+
+def remote_version():
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            "https://api.github.com/repos/%s/commits/%s" % (REPO, BRANCH),
+            headers={"User-Agent": "qqbot-panel", "Accept": "application/vnd.github+json"})
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(req, timeout=15) as r:
+            d = json.loads(r.read().decode("utf-8", "ignore"))
+        return {"sha": d.get("sha", "")[:12],
+                "date": (d.get("commit", {}).get("committer", {}) or {}).get("date", ""),
+                "message": (d.get("commit", {}).get("message", "") or "").splitlines()[0]}
+    except Exception as e:
+        return {"error": str(e)[:120]}
+
+
+def apply_update(sha):
+    import io
+    import tarfile
+    import urllib.request
+    url = "https://codeload.github.com/%s/tar.gz/refs/heads/%s" % (REPO, BRANCH)
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(url, timeout=60) as r:
+        raw = r.read()
+    tf = tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz")
+    members = tf.getmembers()
+    root_dirs = {m.name.split("/")[0] for m in members if "/" in m.name}
+    prefix = sorted(root_dirs)[0] + "/"
+    written = []
+    for m in members:
+        if not m.isfile():
+            continue
+        rel = m.name[len(prefix):]
+        if not rel:
+            continue
+        if not any(rel == f or rel.startswith(f + "/") for f in UPDATE_FILES):
+            continue
+        dst = os.path.join(ROOT, rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with tf.extractfile(m) as src, open(dst + ".new", "wb") as out:
+            shutil.copyfileobj(src, out)
+        os.replace(dst + ".new", dst)
+        written.append(rel)
+    os.makedirs(os.path.dirname(VERSION_FILE), exist_ok=True)
+    with open(VERSION_FILE, "w", encoding="utf-8") as f:
+        f.write(sha)
+    return written
+
+
 # ---------------------------------------------------------------- HTTP
 PAGE = r"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
@@ -316,6 +448,24 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
     <button class="ghost" onclick="loadState()">重新读取</button>
     <span class="muted" id="plen"></span>
   </div>
+</div>
+
+<div class="card"><h2>自启与更新</h2>
+  <div class="row">
+    <div><label>开机自启（可选）</label><div id="autostart" class="muted">读取中…</div></div>
+    <div style="display:flex;align-items:flex-end;gap:8px">
+      <button class="ghost" onclick="toggleAutostart(true)">开启</button>
+      <button class="ghost" onclick="toggleAutostart(false)">关闭</button>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <div><label>版本</label><div id="ver" class="muted">—</div></div>
+    <div style="display:flex;align-items:flex-end;gap:8px">
+      <button class="ghost" onclick="refreshAuto()">检查更新</button>
+      <button onclick="doUpdate()">立即更新</button>
+    </div>
+  </div>
+  <div class="muted" style="margin-top:10px">更新源：github.com/mxy110415/qq-group-persona-bot · 只覆盖代码文件，不动 config / data / persona</div>
 </div>
 
 <div class="card"><h2>日志</h2>
@@ -406,12 +556,40 @@ async function newInst(){
   }catch(e){alert('失败：'+e.message)}
 }
 
+async function refreshAuto(){
+  try{
+    const a=await j('/api/autostart');
+    $('autostart').innerHTML=a.enabled?'<span class="pill ok">已开启</span> '+a.detail:'<span class="pill">未开启</span> '+a.detail;
+  }catch(e){$('autostart').textContent='读取失败'}
+  try{
+    const u=await j('/api/update/check');
+    const r=u.remote||{};
+    $('ver').innerHTML=`本地 <span class="pill">${u.local||'未记录'}</span> 远程 <span class="pill">${r.sha||'取不到'}</span>` +
+      (r.sha&&u.local===r.sha?' <span class="pill ok">已是最新</span>':'') +
+      (r.sha&&u.local!==r.sha?' <span class="pill bad">可更新</span>':'') +
+      `<div class="muted" style="margin-top:6px">${(r.message||'').replace(/</g,'&lt;')} ${r.date?('· '+r.date.slice(0,16)):''}</div>`;
+  }catch(e){$('ver').textContent='检查失败'}
+}
+
+async function toggleAutostart(on){
+  const r=await j('/api/autostart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:on})});
+  alert(r.enabled?'已开启开机自启':'已关闭开机自启'); refreshAuto();
+}
+
+async function doUpdate(){
+  if(!confirm('从 GitHub 拉取最新代码？\n只覆盖 bot.py / panel.py / deploy 等代码文件，配置、人格、数据都不会动。')) return;
+  try{
+    const r=await j('/api/update/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    alert(r.message+'\n更新文件：'+(r.files||[]).join(', ')); refreshAuto();
+  }catch(e){alert('更新失败：'+e.message)}
+}
+
 async function ctrl(action){
   const r=await j('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:CUR,action})});
   alert(r.message||action); setTimeout(loadState,800);
 }
-boot(); setInterval(()=>{if(CUR)loadState()},8000);
+boot(); refreshAuto(); setInterval(()=>{if(CUR)loadState()},8000);
 </script></body></html>"""
 
 
@@ -487,6 +665,10 @@ class Handler(BaseHTTPRequestHandler):
                 with open(p, encoding="utf-8") as f:
                     text = f.read()
             return self._json({"text": text, "path": p})
+        if u.path == "/api/autostart":
+            return self._json(autostart_state())
+        if u.path == "/api/update/check":
+            return self._json({"local": local_version(), "remote": remote_version()})
         if u.path == "/api/logs":
             inst = self._inst(name)
             if not inst:
@@ -557,6 +739,20 @@ class Handler(BaseHTTPRequestHandler):
         if not inst:
             return self._json({"error": "没有实例"}, 404)
         home = instance_home(inst)
+
+        if u.path == "/api/autostart":
+            return self._json(autostart_set(bool(body.get("enabled"))))
+
+        if u.path == "/api/update/apply":
+            rv = remote_version()
+            if rv.get("error"):
+                return self._json({"error": "拉取远程版本失败：" + rv["error"]}, 502)
+            try:
+                files = apply_update(rv["sha"])
+            except Exception as e:
+                return self._json({"error": "更新失败：" + str(e)[:160]}, 500)
+            return self._json({"message": "已更新到 %s，重启面板/机器人后生效" % rv["sha"],
+                               "files": files, "sha": rv["sha"]})
 
         if u.path == "/api/config":
             path = os.path.join(home, "config", "config.json")
