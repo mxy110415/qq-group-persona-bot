@@ -1399,12 +1399,19 @@ function renderForm(){
     const id='f_'+f.key.replace(/\./g,'_');
     if(f.type==='bool')
       return `<div class="field"><label><input type="checkbox" id="${id}" ${v?'checked':''} style="width:auto;margin-right:8px">${f.label}</label></div>`;
-    if(f.type==='secret')
-      return `<div class="field"><label>${f.label}</label><input id="${id}" value="${esc(v)}" autocomplete="off"><div class="hint">掩码表示保留原值，要换就直接填新值</div></div>`;
+    if(f.type==='secret'){
+      const has = v && v!=='' ;
+      return `<div class="field"><label>${f.label}${has?' <span class="pill ok">已设置</span>':''}</label>
+        <input id="${id}" type="password" value="" autocomplete="off"
+               placeholder="${has?'留空表示不修改':'还没有填'}">
+        <div class="hint">${has?'要换就直接填新值':'这里必须填，否则连不上'}</div></div>`;
+    }
     if(f.type==='list')
       return `<div class="field"><label>${f.label}</label><input id="${id}" value="${esc((v||[]).join(','))}"><div class="hint">逗号分隔</div></div>`;
     if(f.type==='pair'||f.type==='pairf')
       return `<div class="field"><label>${f.label}</label><input id="${id}" value="${esc((v||[]).join(','))}"><div class="hint">两个值，逗号分隔</div></div>`;
+    if(f.type==='str')
+      return `<div class="field"><label>${f.label}</label><input id="${id}" type="text" value="${esc(v)}" autocomplete="off">${f.hint?`<div class="hint">${f.hint}</div>`:''}</div>`;
     if(f.key==='api.model')
       return `<div class="field"><label>${f.label}</label>
         <div style="display:flex;gap:8px">
@@ -1412,7 +1419,8 @@ function renderForm(){
           <button class="ghost" style="flex:0 0 auto" onclick="loadModels()">拉取模型</button>
         </div>
         <div class="hint">按 API 地址自动拉 /models 列表；拉不到就直接手填</div></div>`;
-    return `<div class="field"><label>${f.label}</label><input id="${id}" type="number" step="${f.step||'any'}" value="${esc(v)}">${f.hint?`<div class="hint">${f.hint}</div>`:''}</div>`;
+    const t = (f.type==='num') ? 'number' : 'text';
+    return `<div class="field"><label>${f.label}</label><input id="${id}" type="${t}" step="${f.step||'any'}" value="${esc(v)}">${f.hint?`<div class="hint">${f.hint}</div>`:''}</div>`;
   }).join('');
   // 基础页自动拉一次模型列表（静默，失败就算了）
   if(CURTAB==='基础'){
@@ -1977,7 +1985,7 @@ class Handler(BaseHTTPRequestHandler):
                         break
                 if not field:
                     continue
-                if field["type"] == "secret" and val == MASK:
+                if field["type"] == "secret" and (val == MASK or val == ""):
                     continue
                 if field["type"] == "list":
                     val = [x.strip() for x in str(val).split(",") if x.strip()]
