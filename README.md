@@ -204,6 +204,35 @@ meme-pack/
 
 ---
 
+## 三个程序的关系（互相独立）
+
+```
+bot.py       机器人本体   独立进程 / 独立服务
+panel.py     面板后端     独立进程 / 独立服务（HTTP 6100）
+panel_app.py 面板窗口     关掉它只关窗口，面板后端还在
+launcher.py  启动器       检测安装 / 下载 / 打开面板
+```
+
+**关面板不影响机器人**，实测：
+
+```
+systemctl --user stop qqbot-panel   → 面板 inactive
+systemctl is-active qqbot-client    → active（机器人照跑）
+```
+
+反过来也一样：机器人在面板里被停掉，面板仍可正常打开、改配置、再启动它。
+面板里的「启动 / 停止 / 重启」对 systemd 服务和裸进程都生效（用户级服务无需 sudo）。
+
+## 三种获取方式
+
+| 方式 | 适合谁 | 怎么用 |
+|---|---|---|
+| **全量包** `qqbot-v0.1.0-full.zip`（85KB） | 想一次拿全，离线部署 | 解压 → `python3 launcher.py` |
+| **面板安装包** `qqbot-panel-installer.zip`（35KB） | 先要面板，再让面板去下程序 | 解压 → `python3 launcher.py` → 面板里选目录下载 |
+| **命令行** `bootstrap.sh` | 无图形界面的服务器 | 见下一节，一条命令 |
+
+两个 zip 都在 [Releases](https://github.com/mxy110415/qq-group-persona-bot/releases) 页面。
+
 ## 命令行远程安装（无图形界面）
 
 ### Linux / WSL / macOS
