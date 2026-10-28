@@ -117,7 +117,8 @@ sudo loginctl enable-linger $USER
 
 ### 桌面应用形态（推荐）
 
-不想开浏览器？用 `panel_app.py` 把面板包成原生窗口（GTK + WebKit2）：
+不想开浏览器？用 `launcher.py` 一键装好并打开，它内部就是 GTK + WebKit2 原生窗口。
+已装好之后也可以直接跑 `panel_app.py`：
 
 ```bash
 python3 panel_app.py
@@ -203,36 +204,38 @@ meme-pack/
 
 ---
 
-## 一键部署
+## 下载与安装（启动器）
 
-### Linux / macOS
+不用命令行、不用脚本。仓库根目录的 **`launcher.py`** 就是入口：
+
+```
+双击桌面「QQ 机器人面板」快捷方式
+   ↓
+启动器检测本地有没有面板程序
+   ├ 有 → 直接打开面板
+   └ 没有 → 弹窗：选安装位置 + 是否下载 → 下载 → 装依赖 → 打开
+```
+
+命令行同样可用：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mxy110415/qq-group-persona-bot/main/install.sh -o install.sh
-bash install.sh
+python3 launcher.py                       # 图形界面
+python3 launcher.py --dir ~/qqbot --yes   # 静默下载到指定目录
 ```
 
-脚本会：拉代码 → 建 venv → 装依赖 → 生成配置（交互式问 key / 群号）→ 可选装 systemd 自启。
+启动器做的事：
 
-参数：
-
-```bash
-bash install.sh --dir ~/bots/qq     # 指定目录
-bash install.sh --yes               # 非交互（CI/测试）
-bash install.sh --proxy http://127.0.0.1:7897   # 走代理拉代码
+```
+① 从 GitHub 拉源码包（直连失败会自动试本机 7897/7890 代理）
+② 解压到选定的目录（默认 ~/qq-group-persona-bot）
+③ 用示例配置生成 config.json / whitelist.json / group_configs.json
+④ 可选：建 .venv 并安装 websockets
+⑤ 启动 panel.py 并打开窗口
 ```
 
-### Windows
+安装位置记在 `~/.config/qqbot-launcher.json`，下次启动直接用，不再问。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File install.ps1
-```
-
-会下载 zip、建 venv、装依赖、问配置，并在桌面生成「QQ机器人面板」快捷方式。
-
-### 手动部署
-
-不想跑脚本就按下面「快速开始」五步走；也可以用 GitHub Release 里的源码包解压。
+> 也可以用 GitHub Release 右侧的 Source code (zip/tar.gz) 手动下载解压。
 
 ---
 
