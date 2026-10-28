@@ -223,6 +223,44 @@ systemctl is-active qqbot-client    → active（机器人照跑）
 反过来也一样：机器人在面板里被停掉，面板仍可正常打开、改配置、再启动它。
 面板里的「启动 / 停止 / 重启」对 systemd 服务和裸进程都生效（用户级服务无需 sudo）。
 
+### 让面板能直接启停机器人
+
+面板的「启动 / 停止 / 重启」按钮会优先用 systemd：
+
+```
+用户级服务（~/.config/systemd/user/qqbot-bot.service） → 面板可直接控制，无需密码
+系统级服务（/etc/systemd/system/qqbot-client.service） → 需要管理员权限
+裸进程（直接 python bot.py）                          → 按 PID 发信号
+```
+
+如果提示「需要管理员权限」，把机器人装成**用户级服务**即可（推荐）：
+
+```ini
+# ~/.config/systemd/user/qqbot-bot.service
+[Unit]
+Description=QQ Persona Bot
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/qq-group-persona-bot
+ExecStart=/path/to/qq-group-persona-bot/.venv/bin/python bot.py
+Restart=always
+RestartSec=10
+LimitCORE=0
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now qqbot-bot.service
+```
+
+> 面板**不会**为了停止机器人去硬杀进程——系统级服务的 `Restart=always` 会把它拉起来，
+> 结果变成两个实例同时跑（会重复发消息）。所以拿不到权限时只提示，不乱动。
+
 ## 三种获取方式
 
 | 方式 | 适合谁 | 怎么用 |
