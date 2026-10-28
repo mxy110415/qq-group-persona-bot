@@ -141,8 +141,10 @@ cp config/group_configs.example.json config/group_configs.json
 | `admins` | 管理员 QQ 号数组 |
 | `napcat_ws` | NapCat 的 WebSocket 地址 |
 | `ws_token` | NapCat 配置里的 token |
+| `owner_name` | 机器人在人格里怎么称呼主人（默认 `主人`） |
 
 > 人格不在这里：改 `persona/persona.txt` 即可，程序启动时优先读它（文件不存在才回落到 `config.json` 的 `persona` 字段）。
+> 人格里写 `{{OWNER}}` 表示主人的名字，运行时用 `owner_name` 替换 —— **真人名字不要写进人格文件**，留给部署者自己填。
 
 ### 白名单
 
@@ -236,38 +238,65 @@ python bot.py
 
 ---
 
-## 部署（systemd）
+## 部署（完整教程）
 
-```ini
-# /etc/systemd/system/qqbot-client.service
-[Unit]
-Description=QQ Bot client
-After=network-online.target
+仓库里 `deploy/` 目录带了两份可用的 systemd 单元，按下面五步走。
 
-[Service]
-Type=simple
-User=<你的用户>
-WorkingDirectory=/path/to/bot
-ExecStart=/usr/bin/python3 bot.py
-Restart=always
-RestartSec=10
+### 第 1 步：准备 NapCat
 
-[Install]
-WantedBy=multi-user.target
-```
+1. 装 **LinuxQQ NT 版**
+2. 把 **NapCat.Shell**（不是 Framework 版）注入到 QQ 资源目录
+3. 复制一份 QQ 目录到你能改的地方，例如 `/path/to/QQn`
+
+### 第 2 步：拉代码、写配置
 
 ```bash
+git clone https://github.com/mxy110415/qq-group-persona-bot.git
+cd qq-group-persona-bot
+cp config/config.example.json config/config.json
+cp config/whitelist.example.json config/whitelist.json
+cp config/group_configs.example.json config/group_configs.json
+```
+
+改 `config/config.json`：`api.key`、`owner_id`、`owner_name`、`napcat_ws`、`ws_token`；
+改 `config/whitelist.json`：把你的群号和 QQ 号填进去（**不在白名单里完全不响应**）。
+
+### 第 3 步：装服务
+
+```bash
+sudo cp deploy/qqbot-napcat.service deploy/qqbot-client.service /etc/systemd/system/
+# 先把两份文件里的 /path/to/... 和 <你的用户> 改成实际值
 sudo systemctl daemon-reload
-sudo systemctl enable --now qqbot-client
+sudo systemctl enable --now qqbot-napcat qqbot-client
 ```
 
-NapCat 需要图形环境，在无头服务器上用 Xvfb：
+### 第 4 步：扫码登录
 
-```ini
-ExecStartPre=/usr/bin/Xvfb :99 -screen 0 1280x900x24 -nolisten tcp
-ExecStart=/path/to/QQn/qq --no-sandbox --user-data-dir=/path/to/qqdata
-Environment=DISPLAY=:99
+NapCat 首次启动会把二维码写到：
+
 ```
+<QQn>/resources/app/napcat/cache/qrcode.png
+```
+
+取出来用手机 QQ 扫。登录成功后 NapCat 会监听 OneBot11 端口（默认 3000）。
+
+### 第 5 步：确认
+
+```bash
+systemctl status qqbot-napcat qqbot-client --no-pager
+ss -tln | grep -E ':(3000|6099)'
+journalctl -u qqbot-client -f
+```
+
+看到下面这三行就说明通了：
+
+```
+[启动] 模型=... 私聊=白名单 群聊=潜水插嘴 ...
+[连接] 已连上 NapCat: ws://127.0.0.1:3000
+[登录] 机器人 UIN = ...
+```
+
+> 详细说明（含无 sudo 环境的手动启动方式）见 [`deploy/README.md`](deploy/README.md)。
 
 ---
 

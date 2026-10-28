@@ -77,5 +77,6 @@
   "meme_dir": "./meme-pack",
   "owner_only_triggers": [
     "老婆"
-  ]
+  ],
+  "owner_name": "主人"
 }
