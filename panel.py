@@ -231,6 +231,131 @@ def tail(path, n=120):
 
 
 
+
+# ---------------------------------------------------------------- 暂停 / 试聊 / 数据 / 备份
+def pause_state(home):
+    return os.path.exists(os.path.join(home, "data", "paused.flag"))
+
+
+def set_pause(home, paused):
+    fp = os.path.join(home, "data", "paused.flag")
+    os.makedirs(os.path.dirname(fp), exist_ok=True)
+    if paused:
+        with open(fp, "w", encoding="utf-8") as f:
+            f.write("paused\n")
+    elif os.path.exists(fp):
+        os.remove(fp)
+    return pause_state(home)
+
+
+def load_persona_text(home):
+    cfg = read_json(os.path.join(home, "config", "config.json"), {}) or {}
+    fname = os.path.basename(cfg.get("persona_file") or "persona.txt")
+    pth = os.path.join(home, "persona", fname)
+    txt = ""
+    if os.path.exists(pth):
+        with open(pth, encoding="utf-8") as f:
+            txt = f.read()
+    if not txt:
+        txt = cfg.get("persona") or ""
+    return txt.replace("{{OWNER}}", cfg.get("owner_name") or "主人")
+
+
+def test_chat(home, text):
+    cfg = read_json(os.path.join(home, "config", "config.json"), {}) or {}
+    api = cfg.get("api") or {}
+    base = (api.get("base_url") or "").rstrip("/")
+    key = api.get("key") or ""
+    model = api.get("model") or ""
+    if not (base and key and model):
+        return None, "配置里缺 API 地址 / Key / 模型"
+    persona = load_persona_text(home)
+    limits = cfg.get("limits") or {}
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": persona},
+            {"role": "user", "content": text},
+        ],
+        "max_tokens": int(limits.get("reply_max_chars") or 300),
+        "temperature": float(limits.get("temperature") or 0.9),
+        "thinking": {"type": "disabled"},
+    }
+    try:
+        raw = fetch_url(base + "/chat/completions", timeout=60,
+                        headers={"Authorization": "Bearer " + key,
+                                 "Content-Type": "application/json",
+                                 "User-Agent": "qqbot-panel"},
+                        data=json.dumps(payload).encode())
+        d = json.loads(raw.decode("utf-8", "ignore"))
+        msg = (d.get("choices") or [{}])[0].get("message", {}).get("content", "")
+        return msg, None
+    except Exception as e:
+        return None, "调用失败：%s" % str(e)[:160]
+
+
+def data_summary(home):
+    aff = read_json(os.path.join(home, "data", "affinity.json"), {}) or {}
+    mem = read_json(os.path.join(home, "data", "user_memory.json"), {}) or {}
+    a = [{"uid": k, "name": (v or {}).get("name") or "", "score": (v or {}).get("score", 0)}
+         for k, v in aff.items() if isinstance(v, dict)]
+    a.sort(key=lambda x: -float(x.get("score") or 0))
+    m = [{"uid": k, "text": (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False))[:400]}
+         for k, v in mem.items()]
+    return {"affinity": a, "memory": m}
+
+
+def memes_info(home):
+    cfg = read_json(os.path.join(home, "config", "config.json"), {}) or {}
+    d = cfg.get("meme_dir") or os.path.join(home, "meme-pack")
+    if not os.path.isabs(d):
+        d = os.path.join(home, d)
+    out = []
+    if os.path.isdir(d):
+        for sub in sorted(os.listdir(d)):
+            sp = os.path.join(d, sub)
+            if not os.path.isdir(sp):
+                continue
+            files = [f for f in os.listdir(sp) if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp"))]
+            out.append({"dir": sub, "count": len(files), "files": sorted(files)[:50]})
+    return {"dir": d, "groups": out}
+
+
+def backup_zip(home):
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for root, _, files in os.walk(home):
+            rel = os.path.relpath(root, home)
+            if rel.startswith(".venv") or rel.startswith("QQn") or rel.startswith("instances"):
+                continue
+            for f in files:
+                fp = os.path.join(root, f)
+                rp = os.path.relpath(fp, home)
+                if rp.startswith(("config/", "persona/", "data/")):
+                    z.write(fp, rp)
+    return buf.getvalue()
+
+
+def restore_zip(home, data):
+    import io
+    import zipfile
+    n = 0
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        for name in z.namelist():
+            if not (name.startswith(("config/", "persona/", "data/"))):
+                continue
+            if ".." in name or name.endswith("/"):
+                continue
+            dst = os.path.join(home, name)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with z.open(name) as src, open(dst, "wb") as out:
+                shutil.copyfileobj(src, out)
+            n += 1
+    return n
+
+
 # ---------------------------------------------------------------- 机器人进程控制
 BOT_UNITS_USER = "qqbot-bot.service"
 BOT_UNITS_SYSTEM = "qqbot-client.service"
@@ -536,7 +661,7 @@ def save_settings(d):
     os.replace(tmp, SETTINGS_FILE)
 
 
-def fetch_url(url, timeout=20, headers=None):
+def fetch_url(url, timeout=20, headers=None, data=None):
     """先直连；失败则试本机常见代理端口（7897/7890）。返回 bytes。"""
     import urllib.request
     hdrs = headers or {"User-Agent": "qqbot-panel"}
@@ -547,7 +672,7 @@ def fetch_url(url, timeout=20, headers=None):
         try:
             handler = urllib.request.ProxyHandler({} if proxy is None else {"http": proxy, "https": proxy})
             opener = urllib.request.build_opener(handler)
-            req = urllib.request.Request(url, headers=hdrs)
+            req = urllib.request.Request(url, headers=hdrs, data=data)
             with opener.open(req, timeout=timeout) as r:
                 return r.read()
         except Exception as e:
@@ -790,6 +915,8 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 .tst{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);color:var(--txt);
   padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:in .18s ease}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.btnlink{display:inline-block;padding:8px 14px;border-radius:8px;background:var(--acc);color:var(--acc-txt);
+  text-decoration:none;font-weight:600;font-size:13px}
 .themebtn{padding:6px 10px;border-radius:8px;background:var(--sub);border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:12.5px}
 .themebtn.on{color:var(--acc);border-color:var(--acc)}
 .topnav{display:flex;gap:8px;margin:0 0 16px}
@@ -937,6 +1064,51 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   <div class="muted" style="margin-top:10px">更新源：github.com/mxy110415/qq-group-persona-bot · 只覆盖代码文件，不动 config / data / persona</div>
 </div>
 
+<div class="card" data-sec="bot"><h2>开关与试聊</h2>
+  <div class="row" style="align-items:flex-end">
+    <div><label>紧急暂停</label><div id="pausestate" class="muted">读取中…</div></div>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <button class="danger" onclick="setPause(true)">暂停回复</button>
+      <button class="ghost" onclick="setPause(false)">恢复</button>
+    </div>
+  </div>
+  <div class="row" style="margin-top:14px;align-items:flex-end">
+    <div style="flex:3"><label>试聊（只调模型，不发给 QQ）</label><input id="testin" placeholder="输入一句话，回车试"></div>
+    <div><button onclick="doTest()">试一下</button></div>
+  </div>
+  <div id="testout" class="muted" style="margin-top:10px;white-space:pre-wrap"></div>
+</div>
+
+<div class="card" data-sec="bot"><h2>记忆与好感</h2>
+  <div class="row">
+    <div><label>好感度（按分数排序）</label><div id="afflist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
+    <div><label>用户画像</label><div id="memlist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:8px">
+    <button class="ghost" onclick="resetData('affinity')">清空好感度</button>
+    <button class="ghost" onclick="resetData('memory')">清空画像</button>
+    <button class="ghost" onclick="loadData()">刷新</button>
+  </div>
+</div>
+
+<div class="card" data-sec="bot"><h2>表情包</h2>
+  <div id="memes" class="muted">读取中…</div>
+  <div class="row" style="margin-top:12px;align-items:flex-end">
+    <div><label>分类目录</label><input id="memedir" placeholder="开心"></div>
+    <div><label>选择图片</label><input id="memefile" type="file" accept="image/*"></div>
+    <div><button onclick="uploadMeme()">上传</button></div>
+  </div>
+</div>
+
+<div class="card" data-sec="bot"><h2>备份与恢复</h2>
+  <div class="muted">备份内容：config/ + persona/ + data/（含敏感词、好感度），不含 .venv 和 QQ 客户端</div>
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btnlink" href="/api/backup">下载备份 zip</a>
+    <input id="restorefile" type="file" accept=".zip" style="max-width:260px">
+    <button class="ghost" onclick="doRestore()">恢复备份</button>
+  </div>
+</div>
+
 <div class="card" data-sec="bot"><h2>日志</h2>
   <pre id="logs">—</pre>
   <div style="margin-top:10px"><button class="ghost" onclick="loadLogs()">刷新日志</button></div>
@@ -964,12 +1136,13 @@ async function loadState(){
   $('groups').value=(s.groups||[]).join(',');
   $('friends').value=(s.friends||[]).join(',');
   renderQR(s);
-  await loadPersonas(); loadQQ();
+  await loadPersonas(); loadQQ(); loadPause(); loadData(); loadMemes();
   await loadConfig();
   try{ const sn=await j('/api/sensitive?name='+encodeURIComponent(CUR)); $('sens').value=sn.text||''; }catch(e){}
   loadLogs();
 }
 
+setInterval(()=>{ if(CUR && STATE) renderQR(STATE); }, 3000);
 function renderQR(s){
   if(!s.qr_mtime){$('qrbox').innerHTML='<span class="muted">还没有二维码文件</span>';return}
   $('qrbox').innerHTML=`<img class="qr" src="/api/qr?name=${encodeURIComponent(CUR)}&t=${s.qr_mtime}">
@@ -1066,6 +1239,78 @@ async function shotQQ(){
 async function openQQ(){
   const r=await j('/api/qq/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:CUR})});
   alert(r.message); setTimeout(async()=>{await loadQQ(); await loadState();},1500);
+}
+
+/* ---------- 暂停 / 试聊 / 数据 / 表情包 / 备份 ---------- */
+async function loadPause(){
+  try{
+    const d=await j('/api/pause?name='+encodeURIComponent(CUR));
+    $('pausestate').innerHTML = d.paused
+      ? '<span class="pill bad">已暂停（不回复任何消息）</span>'
+      : '<span class="pill ok">运行中</span>';
+  }catch(e){ $('pausestate').textContent='读取失败'; }
+}
+async function setPause(v){
+  await j('/api/pause',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:CUR,paused:v})});
+  toast(v?'已暂停':'已恢复'); loadPause();
+}
+async function doTest(){
+  const t=$('testin').value.trim(); if(!t) return;
+  $('testout').textContent='思考中…';
+  try{
+    const r=await j('/api/test-chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:CUR,text:t})});
+    $('testout').textContent='🤖 '+r.reply;
+  }catch(e){ $('testout').textContent='失败：'+e.message; }
+}
+async function loadData(){
+  try{
+    const d=await j('/api/data?name='+encodeURIComponent(CUR));
+    $('afflist').innerHTML = d.affinity.length
+      ? d.affinity.map(a=>`<div>${a.name||a.uid} <span class="pill">${a.score}</span></div>`).join('')
+      : '<span class="muted">暂无记录</span>';
+    $('memlist').innerHTML = d.memory.length
+      ? d.memory.map(m=>`<div style="margin-bottom:6px">${m.uid}：${m.text}</div>`).join('')
+      : '<span class="muted">暂无画像</span>';
+  }catch(e){}
+}
+async function resetData(kind){
+  if(!(await confirmBox('确定清空 '+kind+' ？不可恢复（建议先备份）','清空数据'))) return;
+  const r=await j('/api/data/reset',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:CUR,kind})});
+  toast(r.message); loadData();
+}
+async function loadMemes(){
+  try{
+    const d=await j('/api/memes?name='+encodeURIComponent(CUR));
+    $('memes').innerHTML = d.groups.length
+      ? d.groups.map(g=>`<div style="margin:4px 0"><span class="pill">${g.dir}</span> ${g.count} 张
+          ${g.files.slice(0,6).map(f=>`<span class="muted"> ${f}</span>`).join('')}</div>`).join('')
+      : '<span class="muted">还没有表情包目录</span>';
+  }catch(e){}
+}
+async function uploadMeme(){
+  const dir=$('memedir').value.trim() || '日常';
+  const f=$('memefile').files[0];
+  if(!f) return toast('先选一张图片');
+  const b64=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});
+  try{
+    const r=await j('/api/memes/upload',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:CUR,dir,filename:f.name,data:b64})});
+    toast(r.message); loadMemes();
+  }catch(e){ toast('失败：'+e.message); }
+}
+async function doRestore(){
+  const f=$('restorefile').files[0];
+  if(!f) return toast('先选备份 zip');
+  if(!(await confirmBox('恢复会覆盖当前 config / persona / data，确定？','恢复备份'))) return;
+  const b64=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});
+  try{
+    const r=await j('/api/restore',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:CUR,zip_base64:b64})});
+    toast(r.message);
+  }catch(e){ toast('失败：'+e.message); }
 }
 
 async function loadConfig(){
@@ -1319,6 +1564,20 @@ class Handler(BaseHTTPRequestHandler):
             with open(qr, "rb") as f:
                 data = f.read()
             return self._send(200, data, "image/png")
+        if u.path == "/api/pause":
+            inst = self._inst(name)
+            return self._json({"paused": pause_state(instance_home(inst))})
+        if u.path == "/api/data":
+            inst = self._inst(name)
+            return self._json(data_summary(instance_home(inst)))
+        if u.path == "/api/memes":
+            inst = self._inst(name)
+            return self._json(memes_info(instance_home(inst)))
+        if u.path == "/api/backup":
+            inst = self._inst(name)
+            data = backup_zip(instance_home(inst))
+            return self._send(200, data, "application/zip",
+                              {"Content-Disposition": 'attachment; filename="qqbot-backup.zip"'})
         if u.path == "/api/models":
             inst = self._inst(name)
             home2 = instance_home(inst)
@@ -1506,6 +1765,76 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "更新失败：" + str(e)[:160]}, 500)
             return self._json({"message": "已更新到 %s，重启面板/机器人后生效" % rv["sha"],
                                "files": files, "sha": rv["sha"]})
+
+        if u.path == "/api/pause":
+            st = set_pause(home, bool(body.get("paused")))
+            return self._json({"paused": st, "message": "已暂停" if st else "已恢复"})
+
+        if u.path == "/api/test-chat":
+            text = (body.get("text") or "").strip()
+            if not text:
+                return self._json({"error": "内容为空"}, 400)
+            reply, err = test_chat(home, text)
+            if err:
+                return self._json({"error": err}, 502)
+            return self._json({"reply": reply})
+
+        if u.path == "/api/data/reset":
+            kind = body.get("kind") or "affinity"
+            n = 0
+            if kind in ("affinity", "both"):
+                fp = os.path.join(home, "data", "affinity.json")
+                if os.path.exists(fp):
+                    os.remove(fp); n += 1
+            if kind in ("memory", "both"):
+                fp = os.path.join(home, "data", "user_memory.json")
+                if os.path.exists(fp):
+                    os.remove(fp); n += 1
+            return self._json({"message": "已清空 %d 个数据文件" % n})
+
+        if u.path == "/api/memes/upload":
+            import base64
+            d = os.path.basename(body.get("dir") or "")
+            nm = os.path.basename(body.get("filename") or "")
+            raw = body.get("data") or ""
+            if not d or not nm or not raw:
+                return self._json({"error": "参数不全"}, 400)
+            if not nm.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")):
+                return self._json({"error": "只支持图片扩展名"}, 400)
+            info = memes_info(home)
+            base = os.path.join(info["dir"], d)
+            os.makedirs(base, exist_ok=True)
+            try:
+                blob = base64.b64decode(raw.split(",")[-1])
+            except Exception:
+                return self._json({"error": "图片数据无效"}, 400)
+            if len(blob) > 3 * 1024 * 1024:
+                return self._json({"error": "超过 3MB"}, 400)
+            with open(os.path.join(base, nm), "wb") as f:
+                f.write(blob)
+            return self._json({"message": "已上传 %s/%s" % (d, nm)})
+
+        if u.path == "/api/memes/delete":
+            info = memes_info(home)
+            d = os.path.basename(body.get("dir") or "")
+            nm = os.path.basename(body.get("filename") or "")
+            fp = os.path.join(info["dir"], d, nm)
+            if os.path.exists(fp):
+                os.remove(fp)
+                return self._json({"message": "已删除"})
+            return self._json({"error": "文件不存在"}, 404)
+
+        if u.path == "/api/restore":
+            raw = body.get("zip_base64") or ""
+            if not raw:
+                return self._json({"error": "没有备份数据"}, 400)
+            import base64
+            try:
+                data = base64.b64decode(raw.split(",")[-1])
+                n = restore_zip(home, data)
+            except Exception as e:
+                return self._json({"error": "恢复失败：%s" % str(e)[:120]}, 400)
+            return self._json({"message": "已恢复 %d 个文件（重启后生效）" % n})
 
         if u.path == "/api/qq/open":
             ok, msg = open_qq(home)

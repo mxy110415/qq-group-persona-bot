@@ -602,6 +602,17 @@ CMD_RESUME = "/恢复"
 PAUSE_CMDS = (CMD_PAUSE, "/停止")
 RESUME_CMDS = (CMD_RESUME, "/继续")
 AI_PAUSED = False          # True 时：除这两个命令外，一律不生成、不发送
+PAUSE_FLAG = os.path.join(DATA_DIR, "paused.flag")   # 面板/文件层面的暂停开关
+
+
+def refresh_pause_flag():
+    """把 data/paused.flag 的存在与否同步到内存（面板可远程暂停）"""
+    global AI_PAUSED
+    try:
+        AI_PAUSED = os.path.exists(PAUSE_FLAG)
+    except Exception:
+        pass
+    return AI_PAUSED
 
 # 上下文不再只靠条数硬砍：超过字符阈值就压成摘要，保留最近几句原文
 COMPRESS_CHARS = int(LIMITS.get("compress_chars", 2500))
@@ -1922,6 +1933,14 @@ async def handle_event(ws, evt):
         cmd = text.strip()
         if cmd in PAUSE_CMDS or cmd in RESUME_CMDS:
             AI_PAUSED = cmd in PAUSE_CMDS
+            try:
+                if AI_PAUSED:
+                    with open(PAUSE_FLAG, "w", encoding="utf-8") as _f:
+                        _f.write("paused\n")
+                elif os.path.exists(PAUSE_FLAG):
+                    os.remove(PAUSE_FLAG)
+            except Exception:
+                pass
             ack = "已暂停。AI 回复全部停掉，只有 /恢复 能重新开口。" if AI_PAUSED else "已恢复，我继续说话。"
             print("[开关] AI_PAUSED = %s（主人指令）" % AI_PAUSED, flush=True)
             if mtype == "private":
@@ -1931,6 +1950,7 @@ async def handle_event(ws, evt):
             return
 
     # 暂停期间：不生成任何回复，也不记上下文，恢复后从干净状态开始
+    refresh_pause_flag()
     if AI_PAUSED:
         return
 
@@ -2350,6 +2370,7 @@ async def main():
 
 
 if __name__ == "__main__":
+    refresh_pause_flag()
     print("[启动] 模型=%s 私聊=白名单 群聊=潜水插嘴 概率=%.1f%% 冷却=%d~%ds 每小时≤%d 静默=%s 好感=开"
           % (MODEL, G_CHANCE * 100, G_MIN_GAP, G_MAX_GAP, G_MAX_PER_HOUR, G_QUIET), flush=True)
     asyncio.run(main())
