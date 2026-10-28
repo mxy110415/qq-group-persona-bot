@@ -730,7 +730,7 @@ def auto_update_loop():
 # ---------------------------------------------------------------- 自启 / 更新
 REPO = "mxy110415/qq-group-persona-bot"
 APP_NAME = "QQ 群聊人格机器人"
-APP_AUTHOR = "life (mxy110415)"
+APP_AUTHOR = "星染 (mxy110415)"
 APP_VERSION = "v0.1.0"
 REPO_URL = "https://github.com/" + REPO
 RELEASES_URL = REPO_URL + "/releases"
@@ -1074,9 +1074,8 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 <div class="card" data-sec="system"><h2>自启与更新</h2>
   <div class="row">
     <div><label>开机自启（可选）</label><div id="autostart" class="muted">读取中…</div></div>
-    <div style="display:flex;align-items:flex-end;gap:8px">
-      <button class="ghost" onclick="toggleAutostart(true)">开启</button>
-      <button class="ghost" onclick="toggleAutostart(false)">关闭</button>
+    <div style="display:flex;align-items:flex-end">
+      <button id="autobtn" class="ghost" onclick="toggleAutostart()">开机自启</button>
     </div>
   </div>
   <div class="row" style="margin-top:12px">
@@ -1503,10 +1502,16 @@ async function saveSettings(){
   alert(r.message||'已保存'); loadSettings();
 }
 
+let AUTO_ON=false;
 async function refreshAuto(){
   try{
     const a=await j('/api/autostart');
+    AUTO_ON=!!a.enabled;
     $('autostart').innerHTML=a.enabled?'<span class="pill ok">已开启</span> '+a.detail:'<span class="pill">未开启</span> '+a.detail;
+    if($('autobtn')){
+      $('autobtn').textContent = AUTO_ON ? '关闭开机自启' : '开启开机自启';
+      $('autobtn').className = AUTO_ON ? 'danger' : '';
+    }
   }catch(e){$('autostart').textContent='读取失败'}
   try{
     const u=await j('/api/update/check');
@@ -1519,8 +1524,9 @@ async function refreshAuto(){
 }
 
 async function toggleAutostart(on){
-  const r=await j('/api/autostart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:on})});
-  alert(r.enabled?'已开启开机自启':'已关闭开机自启'); refreshAuto();
+  const target = (typeof on === 'boolean') ? on : !AUTO_ON;
+  const r=await j('/api/autostart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:target})});
+  toast(r.enabled?'已开启开机自启':'已关闭开机自启'); refreshAuto();
 }
 
 async function doUpdate(){

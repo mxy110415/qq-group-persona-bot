@@ -2,7 +2,7 @@
 
 > 一个有固定人设、长期记忆与好感度的 QQ 群聊 AI，基于 OneBot11 + NapCat + DeepSeek。
 
-**版本** v0.1.0 · **作者** life (mxy110415) ·
+**版本** v0.1.0 · **作者** 星染 (mxy110415) ·
 [GitHub 仓库](https://github.com/mxy110415/qq-group-persona-bot) ·
 [版本发布](https://github.com/mxy110415/qq-group-persona-bot/releases) ·
 [问题反馈](https://github.com/mxy110415/qq-group-persona-bot/issues)
