@@ -1160,11 +1160,22 @@ async function boot(){
 
 async function forceQR(){
   try{
-    const s=await j('/api/state?name='+encodeURIComponent(CUR));
-    QRM=0; renderQR(s); STATE=s;
-    const age=(Date.now()/1000)-(s.qr_mtime||0);
-    if(s.qr_mtime && age>180) toast('已刷新，但这张二维码是 '+Math.round(age/60)+' 分钟前的，可能已过期：点「打开 QQ」重新生成');
-    else toast('二维码已刷新');
+    toast('刷新中…如果二维码没变，会让 QQ 重新生成（约 20 秒）');
+    const st=await j('/api/state?name='+encodeURIComponent(CUR));
+    const r=await j('/api/qr/refresh',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:CUR, since:st.qr_mtime||0})});
+    if(r.changed){
+      QRM=0;
+      const s2=await j('/api/state?name='+encodeURIComponent(CUR));
+      STATE=s2; renderQR(s2); toast('二维码已更新');
+    }else{
+      toast(r.message||'正在重新生成二维码…');
+      for(let i=0;i<6;i++){
+        await new Promise(x=>setTimeout(x,3000));
+        const s2=await j('/api/state?name='+encodeURIComponent(CUR));
+        if(s2.qr_mtime && s2.qr_mtime!==(st.qr_mtime||0)){ STATE=s2; QRM=0; renderQR(s2); break; }
+      }
+    }
   }catch(e){ toast('刷新失败：'+e.message); }
 }
 
@@ -1617,7 +1628,7 @@ class Handler(BaseHTTPRequestHandler):
             body = body.encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.send_header("Content-Length", str(len(body)))
         for k, v in (extra or {}).items():
             self.send_header(k, v)
@@ -1977,6 +1988,44 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 return self._json({"error": "恢复失败：%s" % str(e)[:120]}, 400)
             return self._json({"message": "已恢复 %d 个文件（重启后生效）" % n})
+
+        if u.path == "/api/qr/refresh":
+            inst = self._inst(body.get("name"))
+            h2 = instance_home(inst)
+            qr = os.path.join(h2, inst.get("qr") or "QQn/resources/app/napcat/cache/qrcode.png")
+            try:
+                since = float(body.get("since") or 0)
+            except Exception:
+                since = 0
+            mt = int(os.path.getmtime(qr)) if os.path.exists(qr) else 0
+            if mt and abs(mt - since) >= 1:
+                return self._json({"ok": True, "changed": True, "mtime": mt,
+                                   "message": "二维码已更新"})
+            # 文件没变 → 说明 QQ 没有重新生成，重启到登录界面逼它出新码
+            stamp = os.path.join(h2, "data", ".qrrefresh")
+            now = time.time()
+            try:
+                last = float(open(stamp, encoding="utf-8").read().strip() or 0)
+            except Exception:
+                last = 0
+            if now - last < 25:
+                return self._json({"ok": False, "changed": False,
+                                   "message": "刚重启过，等 %d 秒再试" % int(25 - (now - last))}, 429)
+            try:
+                os.makedirs(os.path.dirname(stamp), exist_ok=True)
+                with open(stamp, "w", encoding="utf-8") as f:
+                    f.write(str(now))
+            except Exception:
+                pass
+            open_qq(h2)          # 窗口检测不一定成功，真正标准是二维码文件有没有更新
+            for _ in range(32):  # 最多等 48 秒
+                time.sleep(1.5)
+                mt2 = int(os.path.getmtime(qr)) if os.path.exists(qr) else 0
+                if mt2 and mt2 != mt:
+                    return self._json({"ok": True, "changed": True, "mtime": mt2,
+                                       "message": "二维码已重新生成"})
+            return self._json({"ok": False, "changed": False,
+                               "message": "等了一分钟还没生成新码，检查 QQ 是否正常启动"})
 
         if u.path == "/api/qq/open":
             ok, msg = open_qq(home)
