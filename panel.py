@@ -1085,9 +1085,9 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
     </div>
     <div class="muted" style="margin-top:8px" id="fbuild">—</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-      <a class="fbtn" id="flink-repo" href="#" target="_blank" rel="noopener">GitHub 仓库</a>
-      <a class="fbtn" id="flink-rel" href="#" target="_blank" rel="noopener">版本发布</a>
-      <a class="fbtn" id="flink-iss" href="#" target="_blank" rel="noopener">问题反馈</a>
+      <a class="fbtn" id="flink-repo" href="#" onclick="return openUrl('repo')">GitHub 仓库</a>
+      <a class="fbtn" id="flink-rel" href="#" onclick="return openUrl('rel')">版本发布</a>
+      <a class="fbtn" id="flink-iss" href="#" onclick="return openUrl('iss')">问题反馈</a>
     </div>
   </div>
 </div>
@@ -1272,6 +1272,18 @@ async function openQQ(){
 }
 
 /* ---------- 暂停 / 试聊 / 数据 / 表情包 / 备份 ---------- */
+async function openUrl(kind){
+  let url = '';
+  try{
+    const d = await j('/api/about');
+    url = kind==='repo' ? d.repo : (kind==='rel' ? d.releases : d.issues);
+    await j('/api/open-url',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url})});
+    toast('已在浏览器打开');
+  }catch(e){ toast('打开失败：'+e.message); if(url) window.location.href = url; }
+  return false;
+}
+
 async function loadAbout(){
   try{
     const d=await j('/api/about');
@@ -1820,6 +1832,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "更新失败：" + str(e)[:160]}, 500)
             return self._json({"message": "已更新到 %s，重启面板/机器人后生效" % rv["sha"],
                                "files": files, "sha": rv["sha"]})
+
+        if u.path == "/api/open-url":
+            url = (body.get("url") or "").strip()
+            allowed = (REPO_URL, RELEASES_URL, ISSUES_URL)
+            if url not in allowed:
+                return self._json({"error": "只允许打开本项目的 GitHub 页面"}, 400)
+            try:
+                if os.name == "nt":
+                    os.startfile(url)  # noqa
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", url])
+                else:
+                    subprocess.Popen(["xdg-open", url],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return self._json({"message": "已在浏览器打开：" + url})
+            except Exception as e:
+                return self._json({"error": "打不开：%s" % str(e)[:100]}, 500)
 
         if u.path == "/api/pause":
             st = set_pause(home, bool(body.get("paused")))
