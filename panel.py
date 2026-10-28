@@ -683,6 +683,9 @@ h1{font-size:18px;margin:0 0 4px}
 .row>*{flex:1;min-width:180px}
 label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
 input,textarea,select{width:100%;background:#121216;border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit}
+select option{background:#121216;color:#e8e8ea}
+select{color-scheme:dark}
+input::placeholder{color:#6f6f78}
 textarea{min-height:46vh;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.65}
 button{background:var(--acc);color:#06101f;border:0;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
 button.ghost{background:#26262c;color:var(--txt)}
@@ -874,6 +877,22 @@ async function loadLogs(){
   const el=$('logs'); el.textContent=d.log||'（暂无日志）'; el.scrollTop=el.scrollHeight;
 }
 
+let MODEL_LIST=[];
+
+async function loadModels(){
+  const sel=document.getElementById('f_api_model');
+  const cur=sel?sel.value:'';
+  try{
+    const d=await j('/api/models?name='+encodeURIComponent(CUR));
+    if(!d.models||!d.models.length) return;
+    MODEL_LIST=d.models;
+    if(sel){
+      sel.innerHTML=d.models.map(m=>`<option value="${m}">${m}</option>`).join('');
+      if(d.models.includes(cur)) sel.value=cur;
+    }
+  }catch(e){ /* 静默：允许手填 */ }
+}
+
 let SCHEMA=null, VALUES=null, CURTAB=null;
 
 let TOPSEC='bot';
@@ -936,8 +955,20 @@ function renderForm(){
       return `<div class="field"><label>${f.label}</label><input id="${id}" value="${esc((v||[]).join(','))}"><div class="hint">逗号分隔</div></div>`;
     if(f.type==='pair'||f.type==='pairf')
       return `<div class="field"><label>${f.label}</label><input id="${id}" value="${esc((v||[]).join(','))}"><div class="hint">两个值，逗号分隔</div></div>`;
+    if(f.key==='api.model')
+      return `<div class="field"><label>${f.label}</label>
+        <div style="display:flex;gap:8px">
+          <select id="${id}"><option value="${esc(v)}">${esc(v||'（先填地址和 Key）')}</option></select>
+          <button class="ghost" style="flex:0 0 auto" onclick="loadModels()">拉取模型</button>
+        </div>
+        <div class="hint">按 API 地址自动拉 /models 列表；拉不到就直接手填</div></div>`;
     return `<div class="field"><label>${f.label}</label><input id="${id}" type="number" step="${f.step||'any'}" value="${esc(v)}">${f.hint?`<div class="hint">${f.hint}</div>`:''}</div>`;
   }).join('');
+  // 基础页自动拉一次模型列表（静默，失败就算了）
+  if(CURTAB==='基础'){
+    setTimeout(()=>{ const sel=document.getElementById('f_api_model');
+      if(sel && sel.options.length<=1) loadModels(); }, 300);
+  }
 }
 
 async function saveTab(){
@@ -1146,6 +1177,25 @@ class Handler(BaseHTTPRequestHandler):
             with open(qr, "rb") as f:
                 data = f.read()
             return self._send(200, data, "image/png")
+        if u.path == "/api/models":
+            inst = self._inst(name)
+            home2 = instance_home(inst)
+            cfg2 = read_json(os.path.join(home2, "config", "config.json"), {}) or {}
+            api2 = cfg2.get("api") or {}
+            base2 = (api2.get("base_url") or "").rstrip("/")
+            key2 = api2.get("key") or ""
+            if not base2 or not key2:
+                return self._json({"error": "先填 API 地址和 Key"}, 400)
+            try:
+                raw2 = fetch_url(base2 + "/models", timeout=15,
+                                 headers={"Authorization": "Bearer " + key2,
+                                          "User-Agent": "qqbot-panel"})
+                d2 = json.loads(raw2.decode("utf-8", "ignore"))
+                ids2 = [m.get("id") for m in (d2.get("data") or []) if m.get("id")]
+                return self._json({"models": ids2, "count": len(ids2)})
+            except Exception as e2:
+                return self._json({"error": "拉取失败：" + str(e2)[:140]}, 502)
+
         if u.path == "/api/qq":
             inst = self._inst(name)
             home2 = instance_home(inst)
