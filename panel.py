@@ -1060,13 +1060,12 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
 </div>
 
 <div class="card" data-sec="napcat"><h2>NapCat 面板</h2>
-  <div class="muted" id="ncw_hint" style="margin-bottom:10px">读取中…</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-    <button class="ghost" onclick="loadNapcatWeb()">刷新</button>
-    <button class="ghost" onclick="openNapcatWeb()">在浏览器中打开</button>
+  <div class="muted" id="ncw_hint" style="margin-bottom:12px">读取中…</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button onclick="openNapcatWeb()">在系统浏览器打开 NapCat 面板</button>
+    <button class="ghost" onclick="loadNapcatWeb()">重新检测</button>
   </div>
-  <iframe id="ncw_frame" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:10px;background:var(--card)"
-          referrerpolicy="no-referrer"></iframe>
+  <div class="hint">NapCat 自带的管理界面是独立的 React 网页，嵌在窗口里会明显拖慢面板，所以改成用系统浏览器打开；改完配置回来点「保存并重启 NapCat」即可。</div>
 </div>
 
 <div class="card" data-sec="napcat"><h2>NapCat 连接</h2>
@@ -1260,16 +1259,17 @@ async function loadNapcatWeb(){
     const d=await j('/api/napcat/webui?name='+encodeURIComponent(CUR));
     NCW_URL=d.url; NCW_PORT=d.port;
     $('ncw_hint').innerHTML = d.running
-      ? `NapCat 自带管理界面 · WebUi 端口 <b>${d.port}</b>（机器人连的是 OneBot 端口 3000，两者不是一回事）`
-      : `NapCat WebUi 没在监听（端口 ${d.port}），先启动 NapCat`;
-    if(d.running) $('ncw_frame').src = d.url + '&t=' + Date.now();
+      ? `NapCat WebUi 正在运行 · WebUi 端口 <b>${d.port}</b>（机器人连的是 OneBot 端口 3000，两者不是一回事）`
+      : `NapCat WebUi 没在监听（端口 ${d.port}），先把 NapCat 启起来`;
   }catch(e){ $('ncw_hint').textContent='读取失败：'+e.message; }
 }
 
 async function openNapcatWeb(){
   try{
-    const d=await j('/api/napcat/webui?name='+encodeURIComponent(CUR));
-    window.open(d.url,'_blank');
+    if(!NCW_URL){ await loadNapcatWeb(); }
+    await j('/api/open-url',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url:NCW_URL})});
+    toast('已在系统浏览器打开 NapCat 面板');
   }catch(e){ toast('打不开：'+e.message); }
 }
 
@@ -1337,7 +1337,7 @@ async function refreshLight(){
   loadQQ();
   loadPause();
   if(TOPSEC==='napcat'){ loadNapcat(); }
-  if(TOPSEC==='napcat' && !$('ncw_frame').src){ loadNapcatWeb(); }
+  if(TOPSEC==='napcat'){ loadNapcatWeb(); }
 }
 
 async function loadState(){
@@ -2075,7 +2075,9 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/open-url":
             url = (body.get("url") or "").strip()
             allowed = (REPO_URL, RELEASES_URL, ISSUES_URL)
-            if url not in allowed:
+            # NapCat WebUi（本机 127.0.0.1 的 /webui/ 路径）也允许交给浏览器
+            local_webui = bool(re.match(r"^https?://(127\.0\.0\.1|localhost)(:\d+)?/webui/", url))
+            if url not in allowed and not local_webui:
                 return self._json({"error": "只允许打开本项目的 GitHub 页面"}, 400)
             try:
                 if os.name == "nt":
