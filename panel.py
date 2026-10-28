@@ -1548,7 +1548,8 @@ async function ctrl(action){
     body:JSON.stringify({name:CUR,action})});
   alert(r.message||action); setTimeout(loadState,800);
 }
-boot(); loadAbout(); topTab('bot'); refreshAuto(); loadSettings(); setInterval(()=>{if(TOPSEC==='bot')loadQQ()},8000); setInterval(()=>{if(CUR)loadState()},8000);
+boot(); loadAbout();
+topTab(new URLSearchParams(location.search).get('tab') || 'bot'); refreshAuto(); loadSettings(); setInterval(()=>{if(TOPSEC==='bot')loadQQ()},8000); setInterval(()=>{if(CUR)loadState()},8000);
 </script></body></html>"""
 
 
