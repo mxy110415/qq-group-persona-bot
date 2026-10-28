@@ -29,7 +29,7 @@ from websockets.asyncio.client import connect
 # 容器内是 UTC，凡涉及"几点"的判断都必须显式换算北京时间
 TZ_CN = timezone(timedelta(hours=8))
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.environ.get("QQBOT_HOME") or os.path.dirname(os.path.abspath(__file__))
 CONF_DIR = os.path.join(BASE, "config")
 DATA_DIR = os.path.join(BASE, "data")
 PERSONA_DIR = os.path.join(BASE, "persona")

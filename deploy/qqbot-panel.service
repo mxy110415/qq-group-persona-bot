@@ -1,0 +1,14 @@
+[Unit]
+Description=QQ Persona Bot Panel (http://127.0.0.1:6100)
+After=network-online.target
+
+[Service]
+Type=simple
+User=<你的用户>
+WorkingDirectory=/path/to/qq-group-persona-bot
+ExecStart=/usr/bin/python3 /path/to/qq-group-persona-bot/panel.py --port 6100
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
