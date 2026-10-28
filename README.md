@@ -203,6 +203,39 @@ meme-pack/
 
 ---
 
+## 一键部署
+
+### Linux / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mxy110415/qq-group-persona-bot/main/install.sh -o install.sh
+bash install.sh
+```
+
+脚本会：拉代码 → 建 venv → 装依赖 → 生成配置（交互式问 key / 群号）→ 可选装 systemd 自启。
+
+参数：
+
+```bash
+bash install.sh --dir ~/bots/qq     # 指定目录
+bash install.sh --yes               # 非交互（CI/测试）
+bash install.sh --proxy http://127.0.0.1:7897   # 走代理拉代码
+```
+
+### Windows
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+会下载 zip、建 venv、装依赖、问配置，并在桌面生成「QQ机器人面板」快捷方式。
+
+### 手动部署
+
+不想跑脚本就按下面「快速开始」五步走；也可以用 GitHub Release 里的源码包解压。
+
+---
+
 ## 快速开始
 
 ### 前置
