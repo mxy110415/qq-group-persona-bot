@@ -162,9 +162,10 @@ def launch_panel(path):
     subprocess.Popen([python_for(path), os.path.join(path, "panel.py"), "--port", "6100"],
                      cwd=path, env=env,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # 面板起来后再开窗口
-    subprocess.Popen([sys.executable, os.path.join(path, "panel_app.py")],
-                     cwd=path, env=env)
+    # 有图形环境才开窗口（纯 CLI 服务器只跑后台面板）
+    if os.name == "nt" or os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+        subprocess.Popen([sys.executable, os.path.join(path, "panel_app.py")],
+                         cwd=path, env=env)
 
 
 # ---------------------------------------------------------------- 图形界面
@@ -300,6 +301,12 @@ def cli(path, yes):
     save_conf({"install_dir": path})
     launch_panel(path)
     print("面板已启动： http://127.0.0.1:6100")
+    print()
+    print("纯命令行服务器（没有桌面）可以这样常驻：")
+    print("  cd %s" % path)
+    print("  nohup ./.venv/bin/python panel.py --port 6100 > panel.log 2>&1 &")
+    print("  nohup ./.venv/bin/python bot.py > bot.log 2>&1 &")
+    print("或者用仓库里的 deploy/*.service 装成 systemd 服务。")
     return 0
 
 
