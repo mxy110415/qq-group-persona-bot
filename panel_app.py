@@ -122,6 +122,33 @@ def main():
     st = view.get_settings()
     st.set_property("enable-javascript", True)
     st.set_property("enable-developer-extras", True)
+
+    # ★ 任何离开本面板的导航一律交给系统浏览器，绝不在窗口里打开网页
+    def open_external(uri):
+        try:
+            subprocess.Popen(["xdg-open", uri],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    def on_decide(_v, decision, dtype):
+        try:
+            if dtype == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
+                uri = decision.get_request().get_uri() or ""
+                if uri.startswith(("http://", "https://")) and not uri.startswith(PANEL_URL):
+                    open_external(uri)
+                    decision.ignore()
+                    return True
+            if dtype == WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION:
+                uri = decision.get_request().get_uri() or ""
+                if uri.startswith(("http://", "https://")):
+                    open_external(uri)
+                    return True
+        except Exception:
+            pass
+        return False
+
+    view.connect("decide-policy", on_decide)
     view.load_uri(PANEL_URL)
     win.add(view)
 

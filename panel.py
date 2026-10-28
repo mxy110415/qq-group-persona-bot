@@ -890,7 +890,10 @@ h1{font-size:18px;margin:0 0 4px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
 .card h2{font-size:13px;color:var(--dim);font-weight:600;margin:0 0 12px;letter-spacing:.04em}
 .row{display:flex;gap:12px;flex-wrap:wrap}
-.row>*{flex:1;min-width:180px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row>*{flex:1 1 220px;min-width:0}
+.row>button{flex:0 0 auto}
+.row>div[style*="flex-end"]{flex:0 0 auto}
 label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
 input,textarea,select{width:100%;background:var(--field);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit}
 select option{background:var(--card);color:var(--txt)}
@@ -909,7 +912,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .pill.ok{background:rgba(61,220,132,.14);color:var(--ok)}
 .pill.bad{background:rgba(255,93,93,.14);color:var(--bad)}
 pre{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;max-height:280px;font-size:12px;margin:0}
-img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;background:#fff;padding:6px}
+img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;background:#fff;padding:6px}
 .muted{color:var(--dim);font-size:12px}
 #mask{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50}
 #mask.on{display:flex}
@@ -922,6 +925,9 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:in .18s ease}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .foot{margin:26px 0 10px;padding-top:16px;border-top:1px solid var(--line)}
+.num{display:inline-block;min-width:22px;color:var(--acc);opacity:.75;font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+@media (max-width: 900px){.grid2{grid-template-columns:1fr}}
 .footrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 .tag{font-size:12px;color:var(--dim);background:var(--sub);border:1px solid var(--line);padding:4px 10px;border-radius:999px}
 .fbtn{font-size:12.5px;color:var(--acc);text-decoration:none;border:1px solid var(--line);background:var(--card);
@@ -952,7 +958,7 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 <div id="toast"></div>
 
 
-<div class="card" data-sec="bot"><h2>实例</h2>
+<div class="card" data-sec="bot"><h2><span class="num">01</span> 实例</h2>
   <div class="row"><div><label>选择实例</label><select id="inst"></select></div>
   <div style="display:flex;align-items:flex-end;gap:8px">
     <button onclick="ctrl('start')">启动</button>
@@ -966,25 +972,36 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2>QQ 登录</h2>
+<div class="card" data-sec="bot"><h2><span class="num">02</span> QQ 登录</h2>
   <div class="row">
-    <div style="flex:0 0 240px"><div id="qrbox" class="muted">没有二维码</div></div>
+    <div style="flex:0 0 210px"><div id="qrbox" class="muted">没有二维码</div></div>
     <div>
-      <div id="accinfo" style="margin-bottom:10px">读取账号…</div>
+      <div id="accinfo" style="margin-bottom:12px">读取账号…</div>
       <label>NapCat 地址</label><input id="ws" readonly>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <button onclick="openQQ()">打开 QQ（重启到登录界面）</button>
-        <button class="ghost" onclick="shotQQ()">尝试截取窗口</button>
       </div>
-      <div class="muted" style="margin-top:8px">「打开 QQ」= 让客户端回到登录界面并生成新二维码；扫码后自动变在线。<br>QQ 跑在无头的 Xvfb 里（没有窗口管理器），所以截图可能是黑的——扫码请用左边这张二维码。</div>
+      <div class="muted" style="margin-top:8px">扫码后自动变在线。「打开 QQ」会让客户端回到登录界面并刷新二维码。</div>
     </div>
-  </div>
-  <div id="qwwrap" style="display:none;margin-top:12px">
-    <img id="qwin" style="width:100%;border-radius:10px;border:1px solid var(--line)">
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2>配置</h2>
+<div class="card" data-sec="bot"><h2><span class="num">03</span> 开关与试聊</h2>
+  <div class="row" style="align-items:flex-end">
+    <div><label>紧急暂停</label><div id="pausestate" class="muted">读取中…</div></div>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <button class="danger" onclick="setPause(true)">暂停回复</button>
+      <button class="ghost" onclick="setPause(false)">恢复</button>
+    </div>
+  </div>
+  <div class="row" style="margin-top:14px;align-items:flex-end">
+    <div style="flex:3"><label>试聊（只调模型，不发给 QQ）</label><input id="testin" placeholder="输入一句话，回车试"></div>
+    <div><button onclick="doTest()">试一下</button></div>
+  </div>
+  <div id="testout" class="muted" style="margin-top:10px;white-space:pre-wrap"></div>
+</div>
+
+<div class="card" data-sec="bot"><h2><span class="num">04</span> 配置</h2>
   <div class="tabs" id="tabs"></div>
   <div id="form" style="margin-top:14px"></div>
   <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
@@ -993,7 +1010,8 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2>白名单</h2>
+<div class="grid2">
+<div class="card" data-sec="bot"><h2><span class="num">05</span> 白名单</h2>
   <div class="row">
     <div><label>群号（逗号分隔）</label><input id="groups"></div>
     <div><label>好友/私聊号（逗号分隔）</label><input id="friends"></div>
@@ -1003,16 +1021,52 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
     <span class="muted">不在这里的群/人，机器人完全不响应</span>
   </div>
 </div>
-
-<div class="card" data-sec="bot"><h2>敏感词库</h2>
+<div class="card" data-sec="bot"><h2><span class="num">06</span> 敏感词库</h2>
   <textarea id="sens" style="min-height:220px" spellcheck="false"></textarea>
   <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
     <button onclick="saveSens()">保存词库</button>
     <span class="muted" id="sensinfo"></span>
   </div>
 </div>
+</div>
 
-<div class="card" data-sec="persona"><h2>人格</h2>
+<div class="grid2">
+<div class="card" data-sec="bot"><h2><span class="num">07</span> 记忆与好感</h2>
+  <div class="row">
+    <div><label>好感度（按分数排序）</label><div id="afflist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
+    <div><label>用户画像</label><div id="memlist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:8px">
+    <button class="ghost" onclick="resetData('affinity')">清空好感度</button>
+    <button class="ghost" onclick="resetData('memory')">清空画像</button>
+    <button class="ghost" onclick="loadData()">刷新</button>
+  </div>
+</div>
+<div class="card" data-sec="bot"><h2><span class="num">08</span> 表情包</h2>
+  <div id="memes" class="muted">读取中…</div>
+  <div class="row" style="margin-top:12px;align-items:flex-end">
+    <div><label>分类目录</label><input id="memedir" placeholder="开心"></div>
+    <div><label>选择图片</label><input id="memefile" type="file" accept="image/*"></div>
+    <div><button onclick="uploadMeme()">上传</button></div>
+  </div>
+</div>
+</div>
+
+<div class="card" data-sec="bot"><h2><span class="num">09</span> 备份与恢复</h2>
+  <div class="muted">备份内容：config/ + persona/ + data/（含敏感词、好感度），不含 .venv 和 QQ 客户端</div>
+  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btnlink" href="/api/backup">下载备份 zip</a>
+    <input id="restorefile" type="file" accept=".zip" style="max-width:260px">
+    <button class="ghost" onclick="doRestore()">恢复备份</button>
+  </div>
+</div>
+
+<div class="card" data-sec="bot"><h2><span class="num">10</span> 日志</h2>
+  <pre id="logs">—</pre>
+  <div style="margin-top:10px"><button class="ghost" onclick="loadLogs()">刷新日志</button></div>
+</div>
+
+<div class="card" data-sec="persona"><h2><span class="num">11</span> 人格</h2>
   <div class="row" style="align-items:flex-end">
     <div style="flex:2"><label>当前编辑的人格文件</label><select id="pfile" onchange="switchPersona()"></select></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1034,7 +1088,8 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="system"><h2>设置</h2>
+<div class="grid2">
+<div class="card" data-sec="system"><h2><span class="num">12</span> 设置</h2>
 
   <div class="row" style="align-items:flex-end">
     <div><label>主题</label>
@@ -1085,63 +1140,13 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
     </div>
     <div class="muted" style="margin-top:8px" id="fbuild">—</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-      <a class="fbtn" id="flink-repo" href="#" onclick="return openUrl('repo')">GitHub 仓库</a>
-      <a class="fbtn" id="flink-rel" href="#" onclick="return openUrl('rel')">版本发布</a>
-      <a class="fbtn" id="flink-iss" href="#" onclick="return openUrl('iss')">问题反馈</a>
+      <a class="fbtn" id="flink-repo" href="#" onclick="openUrl('repo');return false">GitHub 仓库</a>
+      <a class="fbtn" id="flink-rel" href="#" onclick="openUrl('rel');return false">版本发布</a>
+      <a class="fbtn" id="flink-iss" href="#" onclick="openUrl('iss');return false">问题反馈</a>
     </div>
   </div>
 </div>
-
-<div class="card" data-sec="system"><h2>路径</h2><div id="paths" class="muted">读取中…</div></div>
-
-<div class="card" data-sec="bot"><h2>开关与试聊</h2>
-  <div class="row" style="align-items:flex-end">
-    <div><label>紧急暂停</label><div id="pausestate" class="muted">读取中…</div></div>
-    <div style="display:flex;gap:8px;align-items:flex-end">
-      <button class="danger" onclick="setPause(true)">暂停回复</button>
-      <button class="ghost" onclick="setPause(false)">恢复</button>
-    </div>
-  </div>
-  <div class="row" style="margin-top:14px;align-items:flex-end">
-    <div style="flex:3"><label>试聊（只调模型，不发给 QQ）</label><input id="testin" placeholder="输入一句话，回车试"></div>
-    <div><button onclick="doTest()">试一下</button></div>
-  </div>
-  <div id="testout" class="muted" style="margin-top:10px;white-space:pre-wrap"></div>
-</div>
-
-<div class="card" data-sec="bot"><h2>记忆与好感</h2>
-  <div class="row">
-    <div><label>好感度（按分数排序）</label><div id="afflist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
-    <div><label>用户画像</label><div id="memlist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
-  </div>
-  <div style="margin-top:12px;display:flex;gap:8px">
-    <button class="ghost" onclick="resetData('affinity')">清空好感度</button>
-    <button class="ghost" onclick="resetData('memory')">清空画像</button>
-    <button class="ghost" onclick="loadData()">刷新</button>
-  </div>
-</div>
-
-<div class="card" data-sec="bot"><h2>表情包</h2>
-  <div id="memes" class="muted">读取中…</div>
-  <div class="row" style="margin-top:12px;align-items:flex-end">
-    <div><label>分类目录</label><input id="memedir" placeholder="开心"></div>
-    <div><label>选择图片</label><input id="memefile" type="file" accept="image/*"></div>
-    <div><button onclick="uploadMeme()">上传</button></div>
-  </div>
-</div>
-
-<div class="card" data-sec="bot"><h2>备份与恢复</h2>
-  <div class="muted">备份内容：config/ + persona/ + data/（含敏感词、好感度），不含 .venv 和 QQ 客户端</div>
-  <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-    <a class="btnlink" href="/api/backup">下载备份 zip</a>
-    <input id="restorefile" type="file" accept=".zip" style="max-width:260px">
-    <button class="ghost" onclick="doRestore()">恢复备份</button>
-  </div>
-</div>
-
-<div class="card" data-sec="bot"><h2>日志</h2>
-  <pre id="logs">—</pre>
-  <div style="margin-top:10px"><button class="ghost" onclick="loadLogs()">刷新日志</button></div>
+<div class="card" data-sec="system"><h2><span class="num">13</span> 路径</h2><div id="paths" class="muted">读取中…</div></div>
 </div>
 </div>
 <script>
@@ -1275,10 +1280,6 @@ async function loadQQ(){
   }catch(e){ $('accinfo').textContent='账号信息读取失败'; }
 }
 
-async function shotQQ(){
-  $('qwwrap').style.display='';
-  $('qwin').src='/api/qq/window?t='+Date.now();
-}
 
 async function openQQ(){
   const r=await j('/api/qq/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:CUR})});
@@ -1294,7 +1295,7 @@ async function openUrl(kind){
     await j('/api/open-url',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({url})});
     toast('已在浏览器打开');
-  }catch(e){ toast('打开失败：'+e.message); if(url) window.location.href = url; }
+  }catch(e){ toast('打开失败：'+e.message+'\n地址：'+url); }
   return false;
 }
 
@@ -1574,7 +1575,19 @@ async function ctrl(action){
     body:JSON.stringify({name:CUR,action})});
   alert(r.message||action); setTimeout(loadState,800);
 }
+const QS=new URLSearchParams(location.search);
+if('scrollRestoration' in history) history.scrollRestoration='manual';
+if(!QS.get('scroll')){
+  window.scrollTo(0,0);
+  setTimeout(()=>window.scrollTo(0,0), 200);
+  window.addEventListener('load', ()=>setTimeout(()=>window.scrollTo(0,0), 50));
+}
 boot(); loadAbout();
+(()=>{const o=QS.get('open');
+ if(o){setTimeout(()=>openUrl(o),900);} })();
+(()=>{const n=parseInt(QS.get('scroll')||'0',10);
+ if(n>0){setTimeout(()=>{const el=document.querySelectorAll('.card')[n-1];
+   if(el) el.scrollIntoView({block:'start'});},800);}})();
 topTab(new URLSearchParams(location.search).get('tab') || 'bot'); refreshAuto(); loadSettings(); setInterval(()=>{if(CUR)refreshLight()},5000); 
 </script></body></html>"""
 
