@@ -927,8 +927,6 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .foot{margin:26px 0 10px;padding-top:16px;border-top:1px solid var(--line)}
 .num{display:inline-block;min-width:22px;color:var(--acc);opacity:.75;font-variant-numeric:tabular-nums}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
-@media (max-width: 900px){.grid2{grid-template-columns:1fr}}
 .footrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 .tag{font-size:12px;color:var(--dim);background:var(--sub);border:1px solid var(--line);padding:4px 10px;border-radius:999px}
 .fbtn{font-size:12.5px;color:var(--acc);text-decoration:none;border:1px solid var(--line);background:var(--card);
@@ -1011,7 +1009,6 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="grid2">
 <div class="card" data-sec="bot"><h2><span class="num">05</span> 白名单</h2>
   <div class="row">
     <div><label>群号（逗号分隔）</label><input id="groups"></div>
@@ -1029,9 +1026,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
     <span class="muted" id="sensinfo"></span>
   </div>
 </div>
-</div>
 
-<div class="grid2">
 <div class="card" data-sec="bot"><h2><span class="num">07</span> 记忆与好感</h2>
   <div class="row">
     <div><label>好感度（按分数排序）</label><div id="afflist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
@@ -1050,7 +1045,6 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
     <div><label>选择图片</label><input id="memefile" type="file" accept="image/*"></div>
     <div><button onclick="uploadMeme()">上传</button></div>
   </div>
-</div>
 </div>
 
 <div class="card" data-sec="bot"><h2><span class="num">09</span> 备份与恢复</h2>
@@ -1089,7 +1083,6 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="grid2">
 <div class="card" data-sec="system"><h2><span class="num">12</span> 设置</h2>
 
   <div class="row" style="align-items:flex-end">
@@ -1148,7 +1141,6 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 <div class="card" data-sec="system"><h2><span class="num">13</span> 路径</h2><div id="paths" class="muted">读取中…</div></div>
-</div>
 </div>
 <script>
 let STATE=null, CUR=null;
