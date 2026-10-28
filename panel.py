@@ -1020,6 +1020,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
 <div class="topnav" id="topnav">
   <div class="tnav on" data-sec="bot" onclick="topTab('bot')">🤖 QQ 机器人</div>
   <div class="tnav" data-sec="persona" onclick="topTab('persona')">🎭 人格</div>
+  <div class="tnav" data-sec="napcat" onclick="topTab('napcat')">🔌 NapCat</div>
   <div class="tnav" data-sec="system" onclick="topTab('system')">⚙️ 系统</div>
 </div>
 <div id="mask"><div id="dlg"><h3 id="dlgtitle">提示</h3><div id="dlgmsg"></div>
@@ -1058,10 +1059,20 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2>NapCat 连接</h2>
+<div class="card" data-sec="napcat"><h2>NapCat 面板</h2>
+  <div class="muted" id="ncw_hint" style="margin-bottom:10px">读取中…</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <button class="ghost" onclick="loadNapcatWeb()">刷新</button>
+    <button class="ghost" onclick="openNapcatWeb()">在浏览器中打开</button>
+  </div>
+  <iframe id="ncw_frame" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:10px;background:var(--card)"
+          referrerpolicy="no-referrer"></iframe>
+</div>
+
+<div class="card" data-sec="napcat"><h2>NapCat 连接</h2>
   <div class="row">
     <div><label>主机</label><input id="nc_host" placeholder="127.0.0.1"></div>
-    <div><label>端口</label><input id="nc_port" type="number" placeholder="3000"></div>
+    <div><label>OneBot 端口（机器人连这个）</label><input id="nc_port" type="number" placeholder="3000"></div>
     <div><label>令牌（留空表示不修改）</label><input id="nc_token" type="password" autocomplete="off" placeholder="未设置"></div>
   </div>
   <div class="muted" id="nc_hint" style="margin-top:10px">读取中…</div>
@@ -1243,12 +1254,34 @@ async function boot(){
   CUR=d.instances[0]?.name; await loadState();
 }
 
+let NCW_URL='', NCW_PORT=0;
+async function loadNapcatWeb(){
+  try{
+    const d=await j('/api/napcat/webui?name='+encodeURIComponent(CUR));
+    NCW_URL=d.url; NCW_PORT=d.port;
+    $('ncw_hint').innerHTML = d.running
+      ? `NapCat 自带管理界面 · WebUi 端口 <b>${d.port}</b>（机器人连的是 OneBot 端口 3000，两者不是一回事）`
+      : `NapCat WebUi 没在监听（端口 ${d.port}），先启动 NapCat`;
+    if(d.running) $('ncw_frame').src = d.url + '&t=' + Date.now();
+  }catch(e){ $('ncw_hint').textContent='读取失败：'+e.message; }
+}
+
+async function openNapcatWeb(){
+  try{
+    const d=await j('/api/napcat/webui?name='+encodeURIComponent(CUR));
+    window.open(d.url,'_blank');
+  }catch(e){ toast('打不开：'+e.message); }
+}
+
 async function loadNapcat(){
   try{
     const d=await j('/api/napcat/net?name='+encodeURIComponent(CUR));
     if(document.activeElement!==$('nc_host')) $('nc_host').value=d.host||'127.0.0.1';
     if(document.activeElement!==$('nc_port')) $('nc_port').value=d.port||3000;
-    $('nc_hint').textContent=`配置：${d.file||'未找到'} · ${d.enable?'已启用':'已停用'} · 令牌${d.token_set?'已设置':'未设置'}`;
+    $('nc_hint').innerHTML=`OneBot 端口 <b>${d.port}</b>（机器人连接用） · `
+      + `WebUi 端口 <b>${NCW_PORT||'—'}</b>（浏览器管理界面） · `
+      + `${d.enable?'已启用':'已停用'} · 令牌${d.token_set?'已设置':'未设置'}
+      <br><span style="opacity:.7">${d.file||'未找到配置文件'}</span>`;
   }catch(e){ $('nc_hint').textContent='读取失败：'+e.message; }
 }
 
@@ -1303,7 +1336,8 @@ async function refreshLight(){
   }catch(e){}
   loadQQ();
   loadPause();
-  loadNapcat();
+  if(TOPSEC==='napcat'){ loadNapcat(); }
+  if(TOPSEC==='napcat' && !$('ncw_frame').src){ loadNapcatWeb(); }
 }
 
 async function loadState(){
@@ -1398,6 +1432,7 @@ function topTab(sec){
   document.querySelectorAll('.card[data-sec]').forEach(e=>{
     e.style.display = (e.dataset.sec===sec)?'':'none';
   });
+  if(sec==='napcat'){ loadNapcat(); loadNapcatWeb(); }
 }
 
 async function loadQQ(){
@@ -1798,6 +1833,31 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"name": APP_NAME, "author": APP_AUTHOR, "version": APP_VERSION,
                                "build": local_version() or "-", "repo": REPO_URL,
                                "releases": RELEASES_URL, "issues": ISSUES_URL})
+        if u.path == "/api/napcat/webui":
+            inst = self._inst(name)
+            home2 = instance_home(inst)
+            candidates = [
+                os.path.join(home2, "QQn/resources/app/napcat/config/webui.json"),
+                os.path.join(home2, "qqhome/.config/QQ/NapCat/config/webui.json"),
+                os.path.expanduser("~/.config/QQ/NapCat/config/webui.json"),
+            ]
+            token, port, host = "", 6099, "127.0.0.1"
+            for f in candidates:
+                try:
+                    with open(f, encoding="utf-8") as fp:
+                        d = json.load(fp)
+                    token = d.get("token") or ""
+                    port = int(d.get("port") or 6099)
+                    host = d.get("host") or "127.0.0.1"
+                    break
+                except Exception:
+                    continue
+            conn_host = "127.0.0.1" if host in ("::", "0.0.0.0", "") else host
+            url = "http://%s:%d/webui/%s" % (conn_host, port,
+                                             ("?token=" + token) if token else "")
+            return self._json({"url": url, "port": port, "running": port_open(conn_host, port),
+                               "token_set": bool(token)})
+
         if u.path == "/api/napcat/net":
             inst = self._inst(name)
             return self._json(napcat_net(instance_home(inst)))

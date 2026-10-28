@@ -135,7 +135,9 @@ def main():
             if dtype == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
                 req = decision.get_request() if hasattr(decision, "get_request") else None
                 uri = req.get_uri() if req else ""
-                if uri.startswith(("http://", "https://")) and not uri.startswith(PANEL_URL):
+                local = uri.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]"))
+                # 内网本机地址（面板、NapCat WebUi）允许在窗口/内嵌框里加载
+                if uri.startswith(("http://", "https://")) and not local:
                     open_external(uri)
                     decision.ignore()
                     return True
