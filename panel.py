@@ -229,6 +229,79 @@ def tail(path, n=120):
         return "读取日志失败: %s" % e
 
 
+# ---------------------------------------------------------------- 设置
+SETTINGS_FILE = os.path.join(ROOT, "panel-settings.json")
+DEFAULT_SETTINGS = {
+    "auto_update": "off",      # off | check | apply
+    "interval_hours": 6,
+    "instances_dir": "instances",
+}
+_last_check = {"time": 0, "result": ""}
+
+
+def load_settings():
+    d = dict(DEFAULT_SETTINGS)
+    try:
+        with open(SETTINGS_FILE, encoding="utf-8") as f:
+            d.update(json.load(f))
+    except Exception:
+        pass
+    return d
+
+
+def save_settings(d):
+    tmp = SETTINGS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, SETTINGS_FILE)
+
+
+def paths_info():
+    st = load_settings()
+    inst_dir = os.path.join(ROOT, st.get("instances_dir") or "instances")
+    return {
+        "root": ROOT,
+        "config": os.path.join(ROOT, "config"),
+        "persona": os.path.join(ROOT, "persona"),
+        "data": os.path.join(ROOT, "data"),
+        "instances": os.path.abspath(inst_dir),
+        "settings": SETTINGS_FILE,
+        "version": VERSION_FILE,
+        "autostart_unit": (os.path.expanduser("~/.config/systemd/user/qqbot-panel.service")
+                           if os.name != "nt" else "启动文件夹快捷方式"),
+        "note": "全部路径固定，由脚本所在目录决定；实例目录可在下方修改",
+    }
+
+
+def auto_update_loop():
+    while True:
+        st = load_settings()
+        mode = st.get("auto_update", "off")
+        interval = max(1, int(st.get("interval_hours", 6) or 6)) * 3600
+        time.sleep(60)
+        if mode == "off":
+            continue
+        if time.time() - _last_check["time"] < interval:
+            continue
+        rv = remote_version()
+        _last_check["time"] = time.time()
+        if rv.get("error"):
+            _last_check["result"] = "检查失败: " + rv["error"]
+            continue
+        lv = local_version()
+        if rv["sha"] == lv:
+            _last_check["result"] = "已是最新 (%s)" % lv
+            continue
+        if mode == "check":
+            _last_check["result"] = "发现新版本 %s（仅提醒，未自动安装）" % rv["sha"]
+            continue
+        try:
+            files = apply_update(rv["sha"])
+            _last_check["result"] = "已自动更新到 %s（%d 个文件），重启后生效" % (rv["sha"], len(files))
+        except Exception as e:
+            _last_check["result"] = "自动更新失败: " + str(e)[:120]
+
+
 # ---------------------------------------------------------------- 自启 / 更新
 REPO = "mxy110415/qq-group-persona-bot"
 BRANCH = "main"
@@ -450,6 +523,25 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
+<div class="card"><h2>设置</h2>
+  <div class="row">
+    <div><label>自动更新</label>
+      <select id="autoupd">
+        <option value="off">关闭（只手动点）</option>
+        <option value="check">只检查并提示</option>
+        <option value="apply">自动下载安装</option>
+      </select></div>
+    <div><label>检查间隔（小时）</label><input id="interval" type="number" min="1" value="6"></div>
+    <div><label>实例目录（多开）</label><input id="instdir" placeholder="instances"></div>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+    <button onclick="saveSettings()">保存设置</button>
+    <span class="muted" id="lastcheck"></span>
+  </div>
+</div>
+
+<div class="card"><h2>路径</h2><div id="paths" class="muted">读取中…</div></div>
+
 <div class="card"><h2>自启与更新</h2>
   <div class="row">
     <div><label>开机自启（可选）</label><div id="autostart" class="muted">读取中…</div></div>
@@ -556,6 +648,25 @@ async function newInst(){
   }catch(e){alert('失败：'+e.message)}
 }
 
+async function loadSettings(){
+  const st=await j('/api/settings');
+  $('autoupd').value=st.auto_update||'off';
+  $('interval').value=st.interval_hours||6;
+  $('instdir').value=st.instances_dir||'instances';
+  const lc=st._last_check||{};
+  $('lastcheck').textContent = lc.time? ('上次检查 '+new Date(lc.time*1000).toLocaleString('zh-CN')+' · '+(lc.result||'')) : '还没自动检查过';
+  const p=await j('/api/paths');
+  $('paths').innerHTML = Object.entries(p).filter(([k])=>k!=='note')
+    .map(([k,v])=>`<div style="margin:2px 0"><span class="pill">${k}</span> <code>${String(v).replace(/</g,'&lt;')}</code></div>`).join('')
+    + `<div class="muted" style="margin-top:8px">${p.note||''}</div>`;
+}
+
+async function saveSettings(){
+  const body={auto_update:$('autoupd').value, interval_hours:parseInt($('interval').value)||6, instances_dir:$('instdir').value.trim()};
+  const r=await j('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  alert(r.message||'已保存'); loadSettings();
+}
+
 async function refreshAuto(){
   try{
     const a=await j('/api/autostart');
@@ -589,7 +700,7 @@ async function ctrl(action){
     body:JSON.stringify({name:CUR,action})});
   alert(r.message||action); setTimeout(loadState,800);
 }
-boot(); refreshAuto(); setInterval(()=>{if(CUR)loadState()},8000);
+boot(); refreshAuto(); loadSettings(); setInterval(()=>{if(CUR)loadState()},8000);
 </script></body></html>"""
 
 
@@ -665,6 +776,12 @@ class Handler(BaseHTTPRequestHandler):
                 with open(p, encoding="utf-8") as f:
                     text = f.read()
             return self._json({"text": text, "path": p})
+        if u.path == "/api/settings":
+            st = load_settings()
+            st["_last_check"] = dict(_last_check)
+            return self._json(st)
+        if u.path == "/api/paths":
+            return self._json(paths_info())
         if u.path == "/api/autostart":
             return self._json(autostart_state())
         if u.path == "/api/update/check":
@@ -739,6 +856,20 @@ class Handler(BaseHTTPRequestHandler):
         if not inst:
             return self._json({"error": "没有实例"}, 404)
         home = instance_home(inst)
+
+        if u.path == "/api/settings":
+            st = load_settings()
+            if "auto_update" in body:
+                st["auto_update"] = body["auto_update"] if body["auto_update"] in ("off", "check", "apply") else "off"
+            if "interval_hours" in body:
+                try:
+                    st["interval_hours"] = max(1, int(body["interval_hours"]))
+                except Exception:
+                    pass
+            if "instances_dir" in body and body["instances_dir"].strip():
+                st["instances_dir"] = body["instances_dir"].strip()
+            save_settings(st)
+            return self._json({"message": "设置已保存", "settings": st})
 
         if u.path == "/api/autostart":
             return self._json(autostart_set(bool(body.get("enabled"))))
@@ -818,6 +949,7 @@ def main():
     ap.add_argument("--port", type=int, default=6100)
     ap.add_argument("--host", default="127.0.0.1")
     a = ap.parse_args()
+    threading.Thread(target=auto_update_loop, daemon=True).start()
     srv = ThreadingHTTPServer((a.host, a.port), Handler)
     print("面板已启动: http://%s:%d  (Ctrl+C 退出)" % (a.host, a.port), flush=True)
     try:

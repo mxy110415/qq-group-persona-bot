@@ -27,3 +27,8 @@ meme-pack/**/*.jpg
 meme-pack/**/*.png
 meme-pack/**/*.gif
 meme-pack/**/*.webp
+
+# 面板本地设置
+panel-settings.json
+instances/
+panel-bot.log
