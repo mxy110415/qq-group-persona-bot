@@ -229,6 +229,126 @@ def tail(path, n=120):
         return "读取日志失败: %s" % e
 
 
+
+# ---------------------------------------------------------------- QQ 账号 / 窗口
+def ffmpeg_path():
+    import shutil as _sh
+    for cand in ("ffmpeg", "/usr/bin/ffmpeg"):
+        if _sh.which(cand):
+            return _sh.which(cand)
+    import glob as _g
+    hits = sorted(_g.glob(os.path.expanduser("~/.hermes/tools/ffmpeg-*/bin/ffmpeg")))
+    return hits[-1] if hits else None
+
+
+def qq_account(home):
+    """从 bot_state.json 取账号信息，失败则退回解析日志"""
+    st = read_json(os.path.join(home, "data", "bot_state.json"), {}) or {}
+    if not st.get("uin"):
+        for name in ("bot-service.log", "panel-bot.log", "bot.log"):
+            p = os.path.join(home, name)
+            if not os.path.exists(p):
+                continue
+            try:
+                with open(p, "rb") as f:
+                    f.seek(max(0, os.path.getsize(p) - 20000))
+                    txt = f.read().decode("utf-8", "ignore")
+                import re as _re
+                ms = _re.findall(r"机器人 UIN = (\d+)", txt)
+                if ms:
+                    st = {"uin": ms[-1]}
+                    nc = _re.findall(r"昵称:\s*([^|\n]+)", txt)
+                    if nc:
+                        st["nickname"] = nc[-1].strip()
+                    break
+            except Exception:
+                continue
+    cfg = read_json(os.path.join(home, "config", "config.json"), {}) or {}
+    st.setdefault("owner_id", cfg.get("owner_id", ""))
+    st.setdefault("owner_name", cfg.get("owner_name", ""))
+    return st
+
+
+def qq_window_png(size="1280x900"):
+    ff = ffmpeg_path()
+    if not ff:
+        return None
+    out = "/tmp/qqwin_%d.png" % int(time.time())
+    code, _ = _run([ff, "-y", "-loglevel", "error", "-f", "x11grab",
+                    "-video_size", size, "-i", ":99.0+0,0", "-frames:v", "1", out], timeout=20)
+    if code != 0 or not os.path.exists(out):
+        return None
+    with open(out, "rb") as f:
+        data = f.read()
+    if len(data) < 12000:
+        try:
+            os.remove(out)
+        except Exception:
+            pass
+        return None
+    try:
+        os.remove(out)
+    except Exception:
+        pass
+    return data
+
+
+def qq_window_visible():
+    """:99 上有没有可见的 QQ 窗口（大窗口，不是 10x10 的托盘壳）"""
+    code, out = _run(["xwininfo", "-display", ":99", "-root", "-children"], timeout=6)
+    if code != 0:
+        return False
+    for line in out.splitlines():
+        if '"qq"' in line or '"QQ"' in line:
+            import re as _re
+            m = _re.search(r"(\d+)x(\d+)\+", line)
+            if m and int(m.group(1)) > 200 and int(m.group(2)) > 200:
+                return True
+    return False
+
+
+def qq_pids(home):
+    pids = []
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open("/proc/%s/cmdline" % pid, "rb") as f:
+                cmd = f.read().replace(b"\x00", b" ").decode("utf-8", "ignore")
+            if "QQn/qq" in cmd and "--no-sandbox" in cmd and "--type=" not in cmd:
+                pids.append(int(pid))
+        except Exception:
+            continue
+    return pids
+
+
+def open_qq(home):
+    """打开 QQ：已在运行但窗口隐藏 → 触发重启让它重新弹窗；没运行 → 拉起"""
+    if qq_window_visible():
+        return True, "QQ 窗口已显示"
+    pids = qq_pids(home)
+    if pids:
+        for pid in pids:
+            try:
+                os.kill(pid, 15)
+            except Exception:
+                pass
+        for _ in range(40):
+            time.sleep(0.5)
+            if qq_window_visible():
+                return True, "已让 QQ 重新弹出登录窗口"
+        return False, "已请求 QQ 重启，但窗口还没出现，稍后点「刷新窗口截图」看看"
+
+    code, out = _run(["systemctl", "start", "qqbot-napcat.service"], timeout=25)
+    for _ in range(30):
+        time.sleep(0.5)
+        if qq_window_visible():
+            return True, "已通过 systemd 启动 QQ"
+    if not port_open("127.0.0.1", 6099):
+        return False, "启动失败：" + out.strip()[:120]
+    return True, "NapCat 已起来，窗口稍后出现"
+
+
 # ---------------------------------------------------------------- 配置架构
 SCHEMA = {
     "基础": [
@@ -574,6 +694,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 pre{background:#0c0c0f;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;max-height:280px;font-size:12px;margin:0}
 img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;background:#fff;padding:6px}
 .muted{color:var(--dim);font-size:12px}
+.topnav{display:flex;gap:8px;margin:0 0 16px}
+.tnav{padding:9px 16px;border-radius:10px;background:#1b1b1f;border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:13.5px}
+.tnav.on{background:rgba(106,168,255,.16);color:#cfe2ff;border-color:rgba(106,168,255,.5)}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px}
 .tab{padding:6px 12px;border-radius:8px;background:#222228;color:var(--dim);cursor:pointer;font-size:13px;border:1px solid transparent}
 .tab.on{background:rgba(106,168,255,.16);color:#cfe2ff;border-color:rgba(106,168,255,.45)}
@@ -582,8 +705,13 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 </style></head><body><div class="wrap">
 <h1>QQ 群聊人格机器人 · 调试面板</h1>
 <div class="sub" id="sub">加载中…</div>
+<div class="topnav" id="topnav">
+  <div class="tnav on" data-sec="bot" onclick="topTab('bot')">🤖 QQ 机器人</div>
+  <div class="tnav" data-sec="persona" onclick="topTab('persona')">🎭 人格</div>
+  <div class="tnav" data-sec="system" onclick="topTab('system')">⚙️ 系统</div>
+</div>
 
-<div class="card"><h2>实例</h2>
+<div class="card" data-sec="bot"><h2>实例</h2>
   <div class="row"><div><label>选择实例</label><select id="inst"></select></div>
   <div style="display:flex;align-items:flex-end;gap:8px">
     <button onclick="ctrl('start')">启动</button>
@@ -597,16 +725,25 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card"><h2>QQ 登录</h2>
+<div class="card" data-sec="bot"><h2>QQ 登录</h2>
   <div class="row">
     <div style="flex:0 0 240px"><div id="qrbox" class="muted">没有二维码</div></div>
-    <div><label>NapCat 地址</label><input id="ws" readonly>
-      <div class="muted" style="margin-top:8px">扫码后这里会自动变成在线；二维码由 NapCat 生成，过期会自动刷新。</div>
+    <div>
+      <div id="accinfo" style="margin-bottom:10px">读取账号…</div>
+      <label>NapCat 地址</label><input id="ws" readonly>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="openQQ()">打开 QQ（重启到登录界面）</button>
+        <button class="ghost" onclick="shotQQ()">尝试截取窗口</button>
+      </div>
+      <div class="muted" style="margin-top:8px">「打开 QQ」= 让客户端回到登录界面并生成新二维码；扫码后自动变在线。<br>QQ 跑在无头的 Xvfb 里（没有窗口管理器），所以截图可能是黑的——扫码请用左边这张二维码。</div>
     </div>
+  </div>
+  <div id="qwwrap" style="display:none;margin-top:12px">
+    <img id="qwin" style="width:100%;border-radius:10px;border:1px solid var(--line)">
   </div>
 </div>
 
-<div class="card"><h2>配置</h2>
+<div class="card" data-sec="bot"><h2>配置</h2>
   <div class="tabs" id="tabs"></div>
   <div id="form" style="margin-top:14px"></div>
   <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
@@ -615,7 +752,7 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card"><h2>白名单</h2>
+<div class="card" data-sec="bot"><h2>白名单</h2>
   <div class="row">
     <div><label>群号（逗号分隔）</label><input id="groups"></div>
     <div><label>好友/私聊号（逗号分隔）</label><input id="friends"></div>
@@ -626,7 +763,7 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card"><h2>敏感词库</h2>
+<div class="card" data-sec="bot"><h2>敏感词库</h2>
   <textarea id="sens" style="min-height:220px" spellcheck="false"></textarea>
   <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
     <button onclick="saveSens()">保存词库</button>
@@ -634,7 +771,7 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card"><h2>人格</h2>
+<div class="card" data-sec="persona"><h2>人格</h2>
   <div class="row" style="align-items:flex-end">
     <div style="flex:2"><label>当前编辑的人格文件</label><select id="pfile" onchange="switchPersona()"></select></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -656,7 +793,7 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card"><h2>设置</h2>
+<div class="card" data-sec="system"><h2>设置</h2>
   <div class="row">
     <div><label>自动更新</label>
       <select id="autoupd">
@@ -673,9 +810,9 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card"><h2>路径</h2><div id="paths" class="muted">读取中…</div></div>
+<div class="card" data-sec="system"><h2>路径</h2><div id="paths" class="muted">读取中…</div></div>
 
-<div class="card"><h2>自启与更新</h2>
+<div class="card" data-sec="system"><h2>自启与更新</h2>
   <div class="row">
     <div><label>开机自启（可选）</label><div id="autostart" class="muted">读取中…</div></div>
     <div style="display:flex;align-items:flex-end;gap:8px">
@@ -693,7 +830,7 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
   <div class="muted" style="margin-top:10px">更新源：github.com/mxy110415/qq-group-persona-bot · 只覆盖代码文件，不动 config / data / persona</div>
 </div>
 
-<div class="card"><h2>日志</h2>
+<div class="card" data-sec="bot"><h2>日志</h2>
   <pre id="logs">—</pre>
   <div style="margin-top:10px"><button class="ghost" onclick="loadLogs()">刷新日志</button></div>
 </div>
@@ -720,7 +857,7 @@ async function loadState(){
   $('groups').value=(s.groups||[]).join(',');
   $('friends').value=(s.friends||[]).join(',');
   renderQR(s);
-  await loadPersonas();
+  await loadPersonas(); loadQQ();
   await loadConfig();
   try{ const sn=await j('/api/sensitive?name='+encodeURIComponent(CUR)); $('sens').value=sn.text||''; }catch(e){}
   loadLogs();
@@ -738,6 +875,37 @@ async function loadLogs(){
 }
 
 let SCHEMA=null, VALUES=null, CURTAB=null;
+
+let TOPSEC='bot';
+function topTab(sec){
+  TOPSEC=sec;
+  document.querySelectorAll('.tnav').forEach(e=>e.classList.toggle('on', e.dataset.sec===sec));
+  document.querySelectorAll('.card[data-sec]').forEach(e=>{
+    e.style.display = (e.dataset.sec===sec)?'':'none';
+  });
+}
+
+async function loadQQ(){
+  try{
+    const q=await j('/api/qq?name='+encodeURIComponent(CUR));
+    const on = q.online ? '<span class="pill ok">在线</span>' : (q.logging_in?'<span class="pill bad">等待扫码</span>':'<span class="pill bad">离线</span>');
+    $('accinfo').innerHTML = on +
+      ` <span class="pill">QQ ${q.uin||'未知'}</span>` +
+      ` <span class="pill">昵称 ${(q.nickname||'未取到')}</span>` +
+      ` <span class="pill">主人 ${q.owner_name||''}(${q.owner_id||''})</span>` +
+      (q.login_time?`<div class="muted" style="margin-top:6px">登录于 ${new Date(q.login_time*1000).toLocaleString('zh-CN')}</div>`:'');
+  }catch(e){ $('accinfo').textContent='账号信息读取失败'; }
+}
+
+async function shotQQ(){
+  $('qwwrap').style.display='';
+  $('qwin').src='/api/qq/window?t='+Date.now();
+}
+
+async function openQQ(){
+  const r=await j('/api/qq/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:CUR})});
+  alert(r.message); setTimeout(async()=>{await loadQQ(); await loadState();},1500);
+}
 
 async function loadConfig(){
   const d=await j('/api/config?name='+encodeURIComponent(CUR));
@@ -912,7 +1080,7 @@ async function ctrl(action){
     body:JSON.stringify({name:CUR,action})});
   alert(r.message||action); setTimeout(loadState,800);
 }
-boot(); refreshAuto(); loadSettings(); setInterval(()=>{if(CUR)loadState()},8000);
+boot(); topTab('bot'); refreshAuto(); loadSettings(); setInterval(()=>{if(TOPSEC==='bot')loadQQ()},8000); setInterval(()=>{if(CUR)loadState()},8000);
 </script></body></html>"""
 
 
@@ -977,6 +1145,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "二维码还没生成"}, 404)
             with open(qr, "rb") as f:
                 data = f.read()
+            return self._send(200, data, "image/png")
+        if u.path == "/api/qq":
+            inst = self._inst(name)
+            home2 = instance_home(inst)
+            acc = qq_account(home2)
+            cfg = read_json(os.path.join(home2, "config", "config.json"), {}) or {}
+            ws = cfg.get("napcat_ws") or ""
+            import re as _re
+            m = _re.search(r":(\d+)", ws)
+            port = int(m.group(1)) if m else 3000
+            acc["online"] = port_open("127.0.0.1", port)
+            acc["logging_in"] = port_open("127.0.0.1", 6099) and not acc["online"]
+            return self._json(acc)
+        if u.path == "/api/qq/window":
+            data = qq_window_png()
+            if not data:
+                return self._json({"error": "取不到窗口截图（Xvfb :99 或 ffmpeg 不可用）"}, 404)
             return self._send(200, data, "image/png")
         if u.path == "/api/config":
             inst = self._inst(name)
@@ -1129,6 +1314,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "更新失败：" + str(e)[:160]}, 500)
             return self._json({"message": "已更新到 %s，重启面板/机器人后生效" % rv["sha"],
                                "files": files, "sha": rv["sha"]})
+
+        if u.path == "/api/qq/open":
+            ok, msg = open_qq(home)
+            return self._json({"ok": ok, "message": msg})
 
         if u.path == "/api/config":
             path = os.path.join(home, "config", "config.json")

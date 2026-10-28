@@ -2319,8 +2319,20 @@ async def main():
                         except Exception:
                             continue
                         if evt.get("echo") == "self":
-                            SELF_ID = str(evt.get("data", {}).get("user_id", "")) or SELF_ID
-                            print("[登录] 机器人 UIN =", SELF_ID, "| 主人:", OWNER_ID or "未设置", flush=True)
+                            _d = evt.get("data", {}) or {}
+                            SELF_ID = str(_d.get("user_id", "")) or SELF_ID
+                            _nick = str(_d.get("nickname", "") or "")
+                            print("[登录] 机器人 UIN =", SELF_ID, "| 昵称:", _nick, "| 主人:", OWNER_ID or "未设置", flush=True)
+                            try:
+                                _st = {"uin": SELF_ID, "nickname": _nick,
+                                       "owner_id": OWNER_ID, "owner_name": OWNER_NAME,
+                                       "ws": WS_URL, "login_time": time.time()}
+                                _tmp = os.path.join(DATA_DIR, "bot_state.json.tmp")
+                                with open(_tmp, "w", encoding="utf-8") as _f:
+                                    json.dump(_st, _f, ensure_ascii=False)
+                                os.replace(_tmp, os.path.join(DATA_DIR, "bot_state.json"))
+                            except Exception as _e:
+                                print("[状态] 写入 bot_state 失败:", _e, flush=True)
                             continue
                         _echo = evt.get("echo")
                         if _echo in PENDING:
