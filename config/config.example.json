@@ -74,7 +74,7 @@
     "report_hour": 22,
     "report_minute": 30
   },
-  "meme_dir": "/home/xr/apps/qqbot/meme-pack",
+  "meme_dir": "./meme-pack",
   "owner_only_triggers": [
     "老婆"
   ]

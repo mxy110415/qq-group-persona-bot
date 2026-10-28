@@ -79,9 +79,34 @@ config/
   group_configs.example.json 群级配置示例
 data/
   sensitive.json            敏感词库（8 类，可直接改）
+deploy/
+  qqbot-napcat.service      NapCat + Xvfb 单元
+  qqbot-client.service      bot 单元
+  README.md                 部署步骤（改路径 → 安装 → 扫码）
+meme-pack/
+  开心/ 无语/ 生气/ ...     按情绪分类放表情包图片
 ```
 
 运行时会在同目录生成 `config/config.json`、`config/whitelist.json`、`data/affinity.json` 等真实文件（已在 `.gitignore` 里）。
+
+---
+
+## 平台支持
+
+| 平台 | 状态 | 说明 |
+|---|---|---|
+| **Linux** | ✅ 主要支持 | 仓库自带 systemd 单元 + Xvfb 无头方案 |
+| **Windows** | ✅ 可运行 | 用 NapCat 的 Windows 版（`NapCat.Framework.zip`），手动启动 QQ，无需 Xvfb；systemd 换成任务计划或直接双击 |
+| **macOS** | ⚠️ 未验证 | NapCat 对 macOS 支持有限 |
+
+机器人本体（`bot.py`）只依赖 **OneBot11 协议**，不依赖操作系统：
+
+```
+任何能提供 OneBot11 反向/正向 WS 的实现都能接
+（NapCat / go-cqhttp / Lagrange / LLOneBot ...）
+```
+
+只要把 `napcat_ws` 指向对应地址即可，不限于 NapCat。
 
 ---
 

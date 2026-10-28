@@ -1,0 +1,20 @@
+[Unit]
+Description=QQ Persona Bot Client
+After=network-online.target qqbot-napcat.service
+Wants=network-online.target
+Requires=qqbot-napcat.service
+
+[Service]
+Type=simple
+User=<你的用户>
+WorkingDirectory=/path/to/qq-group-persona-bot
+ExecStart=/usr/bin/python3 /path/to/qq-group-persona-bot/bot.py
+Restart=always
+RestartSec=10
+# 关掉 core dump，崩溃时不写几十兆
+LimitCORE=0
+StandardOutput=append:/var/log/qqbot.log
+StandardError=append:/var/log/qqbot.log
+
+[Install]
+WantedBy=multi-user.target

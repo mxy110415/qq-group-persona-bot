@@ -1,0 +1,23 @@
+[Unit]
+Description=LinuxQQ + NapCat (OneBot11)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<你的用户>
+WorkingDirectory=/path/to/QQn
+Environment="DISPLAY=:99"
+# 无头环境：先起 Xvfb
+ExecStartPre=/bin/sh -c '/usr/bin/pgrep -f "Xvfb :99" >/dev/null || (/usr/bin/Xvfb :99 -screen 0 1280x900x24 -nolisten tcp & sleep 2)'
+ExecStart=/path/to/QQn/qq --no-sandbox --user-data-dir=/path/to/qqdata
+Restart=always
+RestartSec=15
+# 优雅退出：给 QQ 时间把登录态落盘（否则下次启动要重新扫码）
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=90
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target
