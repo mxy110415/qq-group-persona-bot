@@ -729,6 +729,12 @@ def auto_update_loop():
 
 # ---------------------------------------------------------------- 自启 / 更新
 REPO = "mxy110415/qq-group-persona-bot"
+APP_NAME = "QQ 群聊人格机器人"
+APP_AUTHOR = "life (mxy110415)"
+APP_VERSION = "v0.1.0"
+REPO_URL = "https://github.com/" + REPO
+RELEASES_URL = REPO_URL + "/releases"
+ISSUES_URL = REPO_URL + "/issues"
 BRANCH = "main"
 VERSION_FILE = os.path.join(ROOT, "data", ".version")
 UPDATE_FILES = ["bot.py", "panel.py", "README.md", "LICENSE", "deploy", "meme-pack/README.md"]
@@ -915,6 +921,12 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 .tst{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--acc);color:var(--txt);
   padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:in .18s ease}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.foot{margin:26px 0 10px;padding-top:16px;border-top:1px solid var(--line)}
+.footrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.tag{font-size:12px;color:var(--dim);background:var(--sub);border:1px solid var(--line);padding:4px 10px;border-radius:999px}
+.fbtn{font-size:12.5px;color:var(--acc);text-decoration:none;border:1px solid var(--line);background:var(--card);
+  padding:6px 12px;border-radius:8px}
+.fbtn:hover{border-color:var(--acc)}
 .btnlink{display:inline-block;padding:8px 14px;border-radius:8px;background:var(--acc);color:var(--acc-txt);
   text-decoration:none;font-weight:600;font-size:13px}
 .themebtn{padding:6px 10px;border-radius:8px;background:var(--sub);border:1px solid var(--line);color:var(--dim);cursor:pointer;font-size:12.5px}
@@ -944,6 +956,19 @@ img.qr{width:220px;height:220px;image-rendering:pixelated;border-radius:8px;back
 <div id="mask"><div id="dlg"><h3 id="dlgtitle">提示</h3><div id="dlgmsg"></div>
   <div id="dlgbtns"><button class="ghost" id="dlgno">取消</button><button id="dlgyes">确定</button></div></div></div>
 <div id="toast"></div>
+<footer class="foot">
+  <div class="footrow">
+    <span class="tag" id="fapp">QQ 群聊人格机器人</span>
+    <span class="tag" id="fver">版本 —</span>
+    <span class="tag" id="fauthor">作者 —</span>
+  </div>
+  <div class="footrow">
+    <a class="fbtn" id="flink-repo" href="#" target="_blank" rel="noopener">GitHub 仓库</a>
+    <a class="fbtn" id="flink-rel" href="#" target="_blank" rel="noopener">版本发布</a>
+    <a class="fbtn" id="flink-iss" href="#" target="_blank" rel="noopener">问题反馈</a>
+  </div>
+  <div class="muted" style="margin-top:8px" id="fbuild">—</div>
+</footer>
 
 <div class="card" data-sec="bot"><h2>实例</h2>
   <div class="row"><div><label>选择实例</label><select id="inst"></select></div>
@@ -1242,6 +1267,19 @@ async function openQQ(){
 }
 
 /* ---------- 暂停 / 试聊 / 数据 / 表情包 / 备份 ---------- */
+async function loadAbout(){
+  try{
+    const d=await j('/api/about');
+    $('fapp').textContent=d.name;
+    $('fver').textContent='版本 '+d.version;
+    $('fauthor').textContent='作者 '+d.author;
+    $('fbuild').textContent='构建 '+d.build+' · 面板仅监听 127.0.0.1';
+    $('flink-repo').href=d.repo;
+    $('flink-rel').href=d.releases;
+    $('flink-iss').href=d.issues;
+  }catch(e){}
+}
+
 async function loadPause(){
   try{
     const d=await j('/api/pause?name='+encodeURIComponent(CUR));
@@ -1498,7 +1536,7 @@ async function ctrl(action){
     body:JSON.stringify({name:CUR,action})});
   alert(r.message||action); setTimeout(loadState,800);
 }
-boot(); topTab('bot'); refreshAuto(); loadSettings(); setInterval(()=>{if(TOPSEC==='bot')loadQQ()},8000); setInterval(()=>{if(CUR)loadState()},8000);
+boot(); loadAbout(); topTab('bot'); refreshAuto(); loadSettings(); setInterval(()=>{if(TOPSEC==='bot')loadQQ()},8000); setInterval(()=>{if(CUR)loadState()},8000);
 </script></body></html>"""
 
 
@@ -1564,6 +1602,10 @@ class Handler(BaseHTTPRequestHandler):
             with open(qr, "rb") as f:
                 data = f.read()
             return self._send(200, data, "image/png")
+        if u.path == "/api/about":
+            return self._json({"name": APP_NAME, "author": APP_AUTHOR, "version": APP_VERSION,
+                               "build": local_version() or "-", "repo": REPO_URL,
+                               "releases": RELEASES_URL, "issues": ISSUES_URL})
         if u.path == "/api/pause":
             inst = self._inst(name)
             return self._json({"paused": pause_state(instance_home(inst))})

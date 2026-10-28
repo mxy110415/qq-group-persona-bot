@@ -2,6 +2,11 @@
 
 > 一个有固定人设、长期记忆与好感度的 QQ 群聊 AI，基于 OneBot11 + NapCat + DeepSeek。
 
+**版本** v0.1.0 · **作者** life (mxy110415) ·
+[GitHub 仓库](https://github.com/mxy110415/qq-group-persona-bot) ·
+[版本发布](https://github.com/mxy110415/qq-group-persona-bot/releases) ·
+[问题反馈](https://github.com/mxy110415/qq-group-persona-bot/issues)
+
 不是那种「@ 一下就回一句罐头话」的机器人。它会**潜水观察群聊、按冷热场决定插不插话**，记得每个人说过什么、跟你熟到什么程度，说话带情绪、会损人、会撒娇 —— 人设是写死在配置里的，不是每次临场编。
 
 ---
