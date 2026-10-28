@@ -957,7 +957,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
 <div id="toast"></div>
 
 
-<div class="card" data-sec="bot"><h2><span class="num">01</span> 实例</h2>
+<div class="card" data-sec="bot"><h2>实例</h2>
   <div class="row"><div><label>选择实例</label><select id="inst"></select></div>
   <div style="display:flex;align-items:flex-end;gap:8px">
     <button onclick="ctrl('start')">启动</button>
@@ -971,7 +971,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2><span class="num">02</span> QQ 登录</h2>
+<div class="card" data-sec="bot"><h2>QQ 登录</h2>
   <div class="row">
     <div style="flex:0 0 210px"><div id="qrbox" class="muted">没有二维码</div></div>
     <div>
@@ -985,7 +985,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2><span class="num">03</span> 开关与试聊</h2>
+<div class="card" data-sec="bot"><h2>开关与试聊</h2>
   <div class="row" style="align-items:flex-end">
     <div><label>紧急暂停</label><div id="pausestate" class="muted">读取中…</div></div>
     <div style="display:flex;gap:8px;align-items:flex-end">
@@ -1000,7 +1000,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   <div id="testout" class="muted" style="margin-top:10px;white-space:pre-wrap"></div>
 </div>
 
-<div class="card" data-sec="bot"><h2><span class="num">04</span> 配置</h2>
+<div class="card" data-sec="bot"><h2>配置</h2>
   <div class="tabs" id="tabs"></div>
   <div id="form" style="margin-top:14px"></div>
   <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
@@ -1009,7 +1009,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2><span class="num">05</span> 白名单</h2>
+<div class="card" data-sec="bot"><h2>白名单</h2>
   <div class="row">
     <div><label>群号（逗号分隔）</label><input id="groups"></div>
     <div><label>好友/私聊号（逗号分隔）</label><input id="friends"></div>
@@ -1019,7 +1019,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
     <span class="muted">不在这里的群/人，机器人完全不响应</span>
   </div>
 </div>
-<div class="card" data-sec="bot"><h2><span class="num">06</span> 敏感词库</h2>
+<div class="card" data-sec="bot"><h2>敏感词库</h2>
   <textarea id="sens" style="min-height:220px" spellcheck="false"></textarea>
   <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
     <button onclick="saveSens()">保存词库</button>
@@ -1027,7 +1027,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2><span class="num">07</span> 记忆与好感</h2>
+<div class="card" data-sec="bot"><h2>记忆与好感</h2>
   <div class="row">
     <div><label>好感度（按分数排序）</label><div id="afflist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
     <div><label>用户画像</label><div id="memlist" class="muted" style="max-height:200px;overflow:auto">读取中…</div></div>
@@ -1038,7 +1038,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
     <button class="ghost" onclick="loadData()">刷新</button>
   </div>
 </div>
-<div class="card" data-sec="bot"><h2><span class="num">08</span> 表情包</h2>
+<div class="card" data-sec="bot"><h2>表情包</h2>
   <div id="memes" class="muted">读取中…</div>
   <div class="row" style="margin-top:12px;align-items:flex-end">
     <div><label>分类目录</label><input id="memedir" placeholder="开心"></div>
@@ -1047,7 +1047,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2><span class="num">09</span> 备份与恢复</h2>
+<div class="card" data-sec="bot"><h2>备份与恢复</h2>
   <div class="muted">备份内容：config/ + persona/ + data/（含敏感词、好感度），不含 .venv 和 QQ 客户端</div>
   <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
     <a class="btnlink" href="/api/backup">下载备份 zip</a>
@@ -1056,12 +1056,12 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="bot"><h2><span class="num">10</span> 日志</h2>
+<div class="card" data-sec="bot"><h2>日志</h2>
   <pre id="logs">—</pre>
   <div style="margin-top:10px"><button class="ghost" onclick="loadLogs()">刷新日志</button></div>
 </div>
 
-<div class="card" data-sec="persona"><h2><span class="num">11</span> 人格</h2>
+<div class="card" data-sec="persona"><h2>人格</h2>
   <div class="row" style="align-items:flex-end">
     <div style="flex:2"><label>当前编辑的人格文件</label><select id="pfile" onchange="switchPersona()"></select></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1083,7 +1083,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
   </div>
 </div>
 
-<div class="card" data-sec="system"><h2><span class="num">12</span> 设置</h2>
+<div class="card" data-sec="system"><h2>设置</h2>
 
   <div class="row" style="align-items:flex-end">
     <div><label>主题</label>
@@ -1140,7 +1140,7 @@ img.qr{width:190px;height:190px;image-rendering:pixelated;border-radius:8px;back
     </div>
   </div>
 </div>
-<div class="card" data-sec="system"><h2><span class="num">13</span> 路径</h2><div id="paths" class="muted">读取中…</div></div>
+<div class="card" data-sec="system"><h2>路径</h2><div id="paths" class="muted">读取中…</div></div>
 </div>
 <script>
 let STATE=null, CUR=null;
